@@ -1,0 +1,108 @@
+:root {
+  color-scheme: dark;
+  font-family: system-ui, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: #111827;
+}
+
+main {
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.4s ease;
+  position: relative;
+}
+
+main.aguardando { background: #111827; }
+main.liberado { background: #065f46; }
+main.negado { background: #7f1d1d; }
+
+.conteudo {
+  display: flex;
+  align-items: center;
+  gap: 64px;
+  max-width: 1000px;
+  width: 100%;
+  padding: 0 48px;
+}
+
+.lado-foto {
+  flex: 0 0 auto;
+  width: 320px;
+  height: 420px;
+  border-radius: 24px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+}
+
+#foto {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.avatar {
+  font-size: 8rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.lado-info {
+  flex: 1;
+  color: white;
+  min-width: 0;
+}
+
+.resultado {
+  font-size: 1.5rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: 0 0 12px;
+  opacity: 0.9;
+}
+
+h1#nome {
+  font-size: 3.5rem;
+  margin: 0 0 16px;
+  line-height: 1.1;
+  word-break: break-word;
+}
+
+.detalhe {
+  font-size: 1.4rem;
+  opacity: 0.85;
+  margin: 0 0 8px;
+}
+
+.horario {
+  font-size: 1.1rem;
+  opacity: 0.6;
+  margin: 0;
+}
+
+.link-voltar {
+  position: absolute;
+  bottom: 20px;
+  left: 24px;
+  color: rgba(255, 255, 255, 0.4);
+  text-decoration: none;
+  font-size: 0.85rem;
+}
+
+.link-voltar:hover {
+  color: rgba(255, 255, 255, 0.8);
+}

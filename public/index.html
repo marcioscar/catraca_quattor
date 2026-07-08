@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Catraca — acesso facial</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <main>
+    <header>
+      <h1>Catraca — acesso facial</h1>
+      <p id="status">Verificando conexão com a catraca...</p>
+      <a href="/monitor.html" class="link-monitor">Abrir monitor ao vivo →</a>
+    </header>
+
+    <section class="card">
+      <h2>Cadastrar aluno</h2>
+      <form id="form-busca">
+        <input id="termo" type="text" placeholder="Nome ou ID do aluno na EVO" autocomplete="off" />
+        <button type="submit">Buscar</button>
+      </form>
+      <p id="busca-mensagem"></p>
+      <ul id="candidatos" class="lista-candidatos"></ul>
+
+      <div id="aluno-encontrado" hidden>
+        <p><strong id="aluno-nome"></strong></p>
+        <p id="aluno-detalhe" class="detalhe"></p>
+
+        <div id="webcam-area">
+          <video id="video" autoplay playsinline muted></video>
+          <canvas id="canvas" hidden></canvas>
+          <img id="foto-preview" hidden alt="Foto capturada" />
+          <div class="botoes">
+            <button id="btn-capturar" type="button">Capturar foto</button>
+            <button id="btn-recapturar" type="button" hidden>Tirar outra</button>
+          </div>
+        </div>
+
+        <button id="btn-cadastrar" type="button" disabled>Cadastrar na catraca</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Alunos cadastrados</h2>
+      <table id="tabela-alunos">
+        <thead>
+          <tr><th>Aluno</th><th>ID</th><th>Status</th><th>Cadastrado em</th><th></th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </section>
+
+    <section class="card">
+      <h2>Últimos acessos</h2>
+      <table id="tabela-acessos">
+        <thead>
+          <tr><th>Quando</th><th>Aluno</th><th>ID</th><th>Resultado</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </section>
+  </main>
+
+  <script src="/app.js"></script>
+</body>
+</html>

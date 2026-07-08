@@ -1,0 +1,148 @@
+:root {
+  color-scheme: light dark;
+  font-family: system-ui, sans-serif;
+}
+
+body {
+  margin: 0;
+  background: #f4f4f5;
+  color: #18181b;
+}
+
+main {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 24px 16px 64px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+header h1 {
+  font-size: 1.4rem;
+  margin-bottom: 4px;
+}
+
+#status.ok { color: #059669; }
+#status.off { color: #dc2626; }
+
+.link-monitor {
+  display: inline-block;
+  margin-top: 8px;
+  font-size: 0.85rem;
+  color: #18181b;
+  text-decoration: underline;
+}
+
+.card {
+  background: white;
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.card h2 {
+  font-size: 1.05rem;
+  margin: 0 0 12px;
+}
+
+#form-busca {
+  display: flex;
+  gap: 8px;
+}
+
+input[type="text"] {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid #d4d4d8;
+  border-radius: 8px;
+  font-size: 0.95rem;
+}
+
+button {
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: none;
+  background: #18181b;
+  color: white;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+button.secundario {
+  background: transparent;
+  color: #18181b;
+  border: 1px solid #d4d4d8;
+}
+
+.lista-candidatos {
+  list-style: none;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 12px 0 0;
+}
+
+.lista-candidatos li button {
+  width: 100%;
+  text-align: left;
+  background: #f4f4f5;
+  color: #18181b;
+  border: 1px solid #e4e4e7;
+}
+
+.detalhe {
+  color: #71717a;
+  font-size: 0.85rem;
+}
+
+#webcam-area {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 0;
+}
+
+video, #foto-preview {
+  width: 240px;
+  height: 320px;
+  object-fit: cover;
+  border-radius: 12px;
+  background: #e4e4e7;
+}
+
+.botoes {
+  display: flex;
+  gap: 8px;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+th, td {
+  text-align: left;
+  padding: 8px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.badge {
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+}
+
+.badge.ativo { background: #d1fae5; color: #065f46; }
+.badge.inativo { background: #fee2e2; color: #991b1b; }
+
+.mensagem-erro { color: #dc2626; }
+.mensagem-ok { color: #059669; }

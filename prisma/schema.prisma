@@ -1,0 +1,35 @@
+generator client {
+    provider = "prisma-client-js"
+}
+
+datasource db {
+    provider = "mongodb"
+    url      = env("DATABASE_URL")
+}
+
+// Mesmo banco Mongo usado pelo app principal (recepcao) — só essas duas
+// coleções pertencem à catraca; o resto do banco não é tocado daqui.
+model CatracaAluno {
+    id           String    @id @default(auto()) @map("_id") @db.ObjectId
+    idMember     Int       @unique // idMember da EVO, reusado como enrollid no device
+    nome         String?
+    fotoBase64   String? // vem do próprio device (senduser) ou capturada na recepção
+    ativo        Boolean   @default(true) // sincronizado pelo job periódico de status EVO
+    enroladoEm   DateTime  @default(now())
+    atualizadoEm DateTime  @updatedAt
+    removidoEm   DateTime?
+
+    @@index([ativo])
+}
+
+model CatracaAcessoLog {
+    id         String   @id @default(auto()) @map("_id") @db.ObjectId
+    idMember   Int // == enrollid recebido no sendlog
+    nome       String?
+    permitido  Boolean
+    motivo     String? // "ok" | "plano_inativo" | "nao_cadastrado"
+    ocorridoEm DateTime @default(now())
+
+    @@index([idMember])
+    @@index([ocorridoEm])
+}

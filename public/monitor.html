@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Catraca — monitor ao vivo</title>
+  <link rel="stylesheet" href="/monitor.css" />
+</head>
+<body>
+  <main id="tela" class="aguardando">
+    <div class="conteudo">
+      <div class="lado-foto">
+        <img id="foto" hidden alt="Foto do aluno" />
+        <div id="avatar" class="avatar">?</div>
+      </div>
+      <div class="lado-info">
+        <p id="resultado" class="resultado">Aguardando movimento...</p>
+        <h1 id="nome">—</h1>
+        <p id="detalhe" class="detalhe"></p>
+        <p id="horario" class="horario"></p>
+      </div>
+    </div>
+    <a href="/" class="link-voltar">← Cadastro</a>
+  </main>
+
+  <script src="/monitor.js"></script>
+</body>
+</html>
