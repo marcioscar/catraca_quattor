@@ -1,10 +1,12 @@
 import { db } from "../db.js";
+import { autorizarEntradaEvo, PERSON_TYPE_CLIENTE, PERSON_TYPE_COLABORADOR } from "./evo-access-control.js";
+import { validarCheckInWellhub, wellhubConfigurado } from "./wellhub-access-control.js";
 import type { SendLogMessage, SendLogRecord } from "./protocol.js";
 
 export interface AccessDecision {
   enrollid: number;
   access: boolean;
-  motivo: "ok" | "plano_inativo" | "nao_cadastrado";
+  motivo: "ok" | "plano_inativo" | "nao_cadastrado" | "wellhub_provisorio";
 }
 
 /** Registros mais antigos que isso são backlog acumulado (reader ficou
@@ -21,8 +23,19 @@ function isHistorico(record: SendLogRecord): boolean {
 }
 
 /**
- * Decide liberar/negar com base só no Mongo local — nunca chama a EVO aqui,
- * já que essa decisão precisa ser instantânea a cada passagem na catraca.
+ * Decide liberar/negar com base só no Mongo local — nunca chama serviço
+ * externo aqui pro caminho normal, já que essa decisão precisa ser
+ * instantânea a cada passagem na catraca. Única exceção: quando o cache
+ * local diz "inativo", confirma em tempo real antes de negar — é o único
+ * jeito de pegar um check-in Wellhub/Totalpass feito minutos antes (não dá
+ * pra cachear isso como o `ativo` normal, sincronizado a cada 10 min).
+ *
+ * Se o aluno tem `wellhubId` cadastrado, valida direto na API da Wellhub
+ * (independente da EVO, ver `wellhub-access-control.ts`). Enquanto as
+ * credenciais da Wellhub não chegam (`wellhubConfigurado() === false`),
+ * libera provisoriamente só por ter `wellhubId` — sem confirmar o check-in
+ * de verdade (ver NOTES.md). Assim que a credencial for configurada, esse
+ * atalho para de valer e passa a validar o check-in de verdade.
  */
 async function decidirAcesso(enrollid: number): Promise<AccessDecision> {
   const aluno = await db.catracaAluno.findUnique({ where: { idMember: enrollid } });
@@ -30,9 +43,27 @@ async function decidirAcesso(enrollid: number): Promise<AccessDecision> {
   if (!aluno) {
     return { enrollid, access: false, motivo: "nao_cadastrado" };
   }
-  return aluno.ativo
-    ? { enrollid, access: true, motivo: "ok" }
-    : { enrollid, access: false, motivo: "plano_inativo" };
+  if (aluno.ativo) {
+    return { enrollid, access: true, motivo: "ok" };
+  }
+
+  if (aluno.wellhubId) {
+    if (!wellhubConfigurado()) {
+      return { enrollid, access: true, motivo: "wellhub_provisorio" };
+    }
+    const autorizacaoWellhub = await validarCheckInWellhub(aluno.wellhubId);
+    if (autorizacaoWellhub?.autorizado) {
+      return { enrollid, access: true, motivo: "ok" };
+    }
+  }
+
+  const personType = aluno.tipo === "colaborador" ? PERSON_TYPE_COLABORADOR : PERSON_TYPE_CLIENTE;
+  const autorizacao = await autorizarEntradaEvo(enrollid, personType);
+  if (autorizacao?.autorizado) {
+    return { enrollid, access: true, motivo: "ok" };
+  }
+
+  return { enrollid, access: false, motivo: "plano_inativo" };
 }
 
 /** Processa um lote de sendlog (pode ter 1 evento em tempo real ou vários de backlog). */

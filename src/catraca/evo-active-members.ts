@@ -7,12 +7,20 @@
  */
 const DEFAULT_BASE_URL = "https://evo-integracao-api.w12app.com.br";
 const MEMBERS_PATH = "/api/v2/members";
+const EMPLOYEES_PATH = "/api/v2/employees";
 const DEFAULT_TIMEOUT_MS = 20000;
 const PAGE_SIZE = 150;
 const MAX_PAGES = 30;
+const EMPLOYEES_PAGE_SIZE = 100;
+const EMPLOYEES_MAX_PAGES = 10;
 
 interface EvoMemberV2 {
   idMember?: number | null;
+}
+
+interface EvoEmployeeV2 {
+  idEmployee?: number | null;
+  status?: string | null;
 }
 
 function getAuthHeader(): string {
@@ -74,6 +82,60 @@ export async function fetchIdMembersAtivos(): Promise<Set<number>> {
       }
     }
     if (lote.length < PAGE_SIZE) {
+      break;
+    }
+  }
+
+  return ids;
+}
+
+async function fetchEmployeesPage(skip: number, retries = 2): Promise<EvoEmployeeV2[]> {
+  const search = new URLSearchParams({ take: String(EMPLOYEES_PAGE_SIZE), skip: String(skip) });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT_MS);
+
+  try {
+    const response = await fetch(`${DEFAULT_BASE_URL}${EMPLOYEES_PATH}?${search}`, {
+      method: "GET",
+      headers: {
+        accept: "application/json",
+        authorization: getAuthHeader(),
+      },
+      signal: controller.signal,
+    });
+
+    if (response.status === 429 && retries > 0) {
+      await sleep(600 * (3 - retries));
+      return fetchEmployeesPage(skip, retries - 1);
+    }
+
+    if (!response.ok) {
+      throw new Error(`Falha na API EVO (employees): HTTP ${response.status} ${response.statusText}`);
+    }
+
+    const payload = await response.json();
+    return Array.isArray(payload) ? (payload as EvoEmployeeV2[]) : [];
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+/**
+ * Todos os idEmployees com status "Ativo" na EVO — colaboradores (professor,
+ * recepção etc.) que também passam pelo leitor facial mas não são "membros".
+ * `/api/v2/employees` não tem filtro de status na query, então filtra aqui.
+ */
+export async function fetchIdEmployeesAtivos(): Promise<Set<number>> {
+  const ids = new Set<number>();
+
+  for (let page = 0; page < EMPLOYEES_MAX_PAGES; page += 1) {
+    const lote = await fetchEmployeesPage(page * EMPLOYEES_PAGE_SIZE);
+    for (const funcionario of lote) {
+      if (typeof funcionario.idEmployee === "number" && funcionario.status === "Ativo") {
+        ids.add(funcionario.idEmployee);
+      }
+    }
+    if (lote.length < EMPLOYEES_PAGE_SIZE) {
       break;
     }
   }

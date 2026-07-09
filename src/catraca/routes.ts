@@ -4,6 +4,7 @@ import { enrollAluno, removeAluno } from "./enroll-service.js";
 import { isConnected, getLastSeenAt, send } from "./connection-manager.js";
 import { buscarAlunoEvo } from "./evo-aluno-busca.js";
 import { enriquecerNomesEvo, getProgressoEnriquecimento } from "./enriquecer-nomes-evo.js";
+import { sincronizarClientesEvo, getProgressoSincronizacaoClientes } from "./evo-clientes-sync.js";
 import { NAO_REMOVIDO } from "./filtros.js";
 
 interface EnrollBody {
@@ -84,6 +85,30 @@ export async function catracaRoutes(app: FastifyInstance): Promise<void> {
     }
   );
 
+  // Cadastro manual do gympass_id (Wellhub) do aluno — ainda não tem origem
+  // automática, ver NOTES.md. `wellhubId: null` remove o vínculo.
+  app.patch<{ Params: { idMember: string }; Body: { wellhubId?: string | null } }>(
+    "/catraca/alunos/:idMember/wellhub-id",
+    async (request, reply) => {
+      const idMember = Number(request.params.idMember);
+      if (!Number.isInteger(idMember)) {
+        reply.code(400);
+        return { erro: "idMember inválido." };
+      }
+      const { wellhubId } = request.body;
+      if (wellhubId !== null && typeof wellhubId !== "string") {
+        reply.code(400);
+        return { erro: "wellhubId deve ser string ou null." };
+      }
+
+      await db.catracaAluno.update({
+        where: { idMember },
+        data: { wellhubId: wellhubId?.trim() || null },
+      });
+      return { ok: true };
+    }
+  );
+
   // Rota temporária de bring-up: manda um comando cru pro dispositivo pra
   // descobrir o formato real de respostas (resposta chega via log do WS, não
   // no corpo desta rota). Remover depois que o protocolo estiver confirmado.
@@ -103,13 +128,40 @@ export async function catracaRoutes(app: FastifyInstance): Promise<void> {
 
   app.get("/catraca/enriquecer-nomes", async () => getProgressoEnriquecimento());
 
+  // Importa cadastro completo (CPF, telefone, endereço, gympassId etc.) de
+  // GET /api/v2/members (EVO) pra coleção EvoCliente — ver evo-clientes-sync.ts.
+  // ?skip=N retoma de onde uma rodada anterior parou (ver GET .../ultimoSkip).
+  app.post("/catraca/sincronizar-clientes", async (request) => {
+    const query = request.query as { skip?: string };
+    const skipInicial = Number(query.skip) || 0;
+    sincronizarClientesEvo(skipInicial).catch((error) =>
+      console.error("[catraca] erro na sincronização de clientes:", error)
+    );
+    return { ok: true };
+  });
+
+  app.get("/catraca/sincronizar-clientes", async () => getProgressoSincronizacaoClientes());
+
   app.get("/catraca/acessos", async (request) => {
     const query = request.query as { take?: string };
     const take = Math.min(Number(query.take) || 50, 200);
-    return db.catracaAcessoLog.findMany({
+    const acessos = await db.catracaAcessoLog.findMany({
       orderBy: { ocorridoEm: "desc" },
       take,
     });
+
+    const idMembers = [...new Set(acessos.map((acesso) => acesso.idMember))];
+    const alunos = await db.catracaAluno.findMany({
+      where: { idMember: { in: idMembers } },
+      select: { idMember: true, nome: true },
+    });
+    const nomePorIdMember = new Map(alunos.map((aluno) => [aluno.idMember, aluno.nome]));
+
+    // Prefere o nome já enriquecido via EVO; o do sendlog (device) costuma vir vazio.
+    return acessos.map((acesso) => ({
+      ...acesso,
+      nome: nomePorIdMember.get(acesso.idMember) ?? acesso.nome,
+    }));
   });
 
   // Último acesso + dados do aluno (foto, status), para o monitor ao vivo da recepção.
@@ -123,13 +175,14 @@ export async function catracaRoutes(app: FastifyInstance): Promise<void> {
 
     const aluno = await db.catracaAluno.findUnique({
       where: { idMember: ultimo.idMember },
-      select: { fotoBase64: true, ativo: true },
+      select: { nome: true, fotoBase64: true, ativo: true },
     });
 
     return {
       id: ultimo.id,
       idMember: ultimo.idMember,
-      nome: ultimo.nome,
+      // Prefere o nome já enriquecido via EVO; o do sendlog (device) costuma vir vazio.
+      nome: aluno?.nome ?? ultimo.nome,
       permitido: ultimo.permitido,
       motivo: ultimo.motivo,
       ocorridoEm: ultimo.ocorridoEm,

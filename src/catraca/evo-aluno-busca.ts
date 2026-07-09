@@ -4,6 +4,8 @@
  * apps/web/app/lib/evo-member-membership.server.ts (sem os campos de venda/
  * autorização de pagamento, que são específicos do fluxo de cancelamento).
  */
+import { getColaboradorConhecido } from "./colaboradores-conhecidos.js";
+
 const DEFAULT_BASE_URL = "https://evo-integracao-api.w12app.com.br";
 const MEMBER_MEMBERSHIP_PATH = "/api/v3/membermembership";
 const MEMBERS_PATH = "/api/v2/members";
@@ -145,6 +147,40 @@ async function getMembersByName(nome: string): Promise<EvoMemberResumo[]> {
   return normalizeMembersPayload(payload);
 }
 
+interface MemberPerfil {
+  idMember?: number | null;
+  firstName?: string | null;
+  lastName?: string | null;
+}
+
+/**
+ * `/api/v2/members` (lista) não tem filtro por idMember — só name/document/etc.
+ * Pra buscar um membro específico por id é `/api/v2/members/{idMember}` (path,
+ * não query), que devolve o perfil completo mesmo sem nenhum contrato.
+ */
+async function getMemberPorId(idMember: number): Promise<MemberPerfil | null> {
+  return fetchEvoJson<MemberPerfil>(`${DEFAULT_BASE_URL}${MEMBERS_PATH}/${idMember}`);
+}
+
+const EMPLOYEES_PATH = "/api/v2/employees";
+
+interface EmployeeResumo {
+  idEmployee?: number | null;
+  name?: string | null;
+  status?: string | null;
+}
+
+/**
+ * Colaboradores (professores, recepção etc.) usam o mesmo leitor facial mas
+ * não são "membros" na EVO — vivem num espaço de id separado (`idEmployee`),
+ * com seu próprio endpoint e status ("Ativo"/"Inativo"/"Bloqueado").
+ */
+async function getFuncionarioPorId(idEmployee: number): Promise<EmployeeResumo | null> {
+  const search = new URLSearchParams({ idEmployee: String(idEmployee), take: "1", skip: "0" });
+  const payload = await fetchEvoJson<EmployeeResumo[]>(`${DEFAULT_BASE_URL}${EMPLOYEES_PATH}?${search}`);
+  return Array.isArray(payload) ? (payload.find((e) => e.idEmployee === idEmployee) ?? null) : null;
+}
+
 function pickMembershipPrincipal(memberships: MemberMembership[]): MemberMembership | null {
   const ativos = filtrarContratosAtivos(memberships);
   if (!ativos.length) {
@@ -211,30 +247,99 @@ export interface AlunoEvoNomeStatus {
   idMember: number;
   nome: string | null;
   ativo: boolean;
+  tipo: "aluno" | "colaborador";
 }
 
 /**
- * Nome + status por idMember SEM filtrar só contratos ativos — usado para
- * enriquecer o cadastro importado do dispositivo (queremos o nome mesmo de
- * quem está inativo/cancelado, para exibir na lista).
+ * Nome + status por idMember/enrollid SEM filtrar só contratos ativos — usado
+ * para enriquecer o cadastro importado do dispositivo (queremos o nome mesmo
+ * de quem está inativo/cancelado, para exibir na lista).
+ *
+ * O enrollid do device pode ser tanto um `idMember` (aluno) quanto um
+ * `idEmployee` (colaborador — professor, recepção etc.) — os dois usam o
+ * mesmo leitor facial mas são espaços de id **separados** na EVO, que podem
+ * colidir numericamente mesmo com nomes reais dos dois lados (confirmado:
+ * idMember 54 é uma aluna inativa real, idEmployee 54 é um professor ativo
+ * real — não dá pra resolver isso só por heurística). Por isso a ordem é:
+ *
+ * 1. Lista manual de colaboradores conhecidos (`colaboradores-conhecidos.ts`,
+ *    fornecida pelo dono da academia) — vence qualquer outra coisa, porque é
+ *    o único sinal confiável quando os dois espaços de id colidem.
+ * 2. Contrato com nome de verdade (sinal forte de aluno).
+ * 3. Se o contrato vier anonimizado (LGPD), tenta funcionário antes de
+ *    aceitar o dado anonimizado.
+ * 4. Funcionário (fallback quando não há contrato nenhum).
+ * 5. Perfil puro de membro sem contrato (último recurso).
  */
+const MARCADOR_ANONIMIZADO = "dados removidos";
+
+function pareceAnonimizado(nome: string | null | undefined): boolean {
+  return nome?.toLowerCase().includes(MARCADOR_ANONIMIZADO) ?? false;
+}
+
 export async function buscarNomeEStatusPorIdMember(idMember: number): Promise<AlunoEvoNomeStatus | null> {
-  const memberships = await getMembershipsByIdMember(idMember, false);
-  if (memberships.length === 0) {
-    return null;
+  const colaboradorConhecido = getColaboradorConhecido(idMember);
+  if (colaboradorConhecido) {
+    return {
+      idMember,
+      nome: colaboradorConhecido.nome,
+      ativo: colaboradorConhecido.status.toLowerCase() === "ativo",
+      tipo: "colaborador",
+    };
   }
 
-  const maisRecente = [...memberships].sort((a, b) => {
-    const dateA = new Date(a.membershipEnd ?? a.membershipStart ?? 0).getTime();
-    const dateB = new Date(b.membershipEnd ?? b.membershipStart ?? 0).getTime();
-    return dateB - dateA;
-  })[0];
+  const memberships = await getMembershipsByIdMember(idMember, false);
+  if (memberships.length > 0) {
+    const maisRecente = [...memberships].sort((a, b) => {
+      const dateA = new Date(a.membershipEnd ?? a.membershipStart ?? 0).getTime();
+      const dateB = new Date(b.membershipEnd ?? b.membershipStart ?? 0).getTime();
+      return dateB - dateA;
+    })[0];
+    const nomeContrato = maisRecente.name ?? null;
 
-  return {
-    idMember,
-    nome: maisRecente.name ?? null,
-    ativo: memberships.some((m) => m.statusMemberMembership === STATUS_CONTRATO_ATIVO),
-  };
+    if (!pareceAnonimizado(nomeContrato)) {
+      return {
+        idMember,
+        nome: nomeContrato,
+        ativo: memberships.some((m) => m.statusMemberMembership === STATUS_CONTRATO_ATIVO),
+        tipo: "aluno",
+      };
+    }
+
+    // Contrato existe mas o nome foi anonimizado (LGPD) — antes de aceitar
+    // esse dado "morto", checa se esse id também é um funcionário ativo.
+    const funcionarioDoAnonimizado = await getFuncionarioPorId(idMember);
+    if (funcionarioDoAnonimizado?.name) {
+      return {
+        idMember,
+        nome: funcionarioDoAnonimizado.name.trim(),
+        ativo: funcionarioDoAnonimizado.status === "Ativo",
+        tipo: "colaborador",
+      };
+    }
+
+    return {
+      idMember,
+      nome: nomeContrato,
+      ativo: memberships.some((m) => m.statusMemberMembership === STATUS_CONTRATO_ATIVO),
+      tipo: "aluno",
+    };
+  }
+
+  const funcionario = await getFuncionarioPorId(idMember);
+  if (funcionario?.name) {
+    return { idMember, nome: funcionario.name.trim(), ativo: funcionario.status === "Ativo", tipo: "colaborador" };
+  }
+
+  // Sem contrato e sem cadastro de funcionário — último recurso: perfil puro
+  // de membro (existe mesmo sem nenhum membermembership associado).
+  const perfil = await getMemberPorId(idMember);
+  if (perfil) {
+    const nome = [perfil.firstName, perfil.lastName].filter(Boolean).join(" ").trim() || null;
+    return { idMember, nome, ativo: false, tipo: "aluno" };
+  }
+
+  return null;
 }
 
 async function buscarMembershipsPorTermo(

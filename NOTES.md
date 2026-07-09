@@ -95,6 +95,136 @@ confirmado observando tráfego real:
   prazo do usuário é substituir esse sistema pelo daqui — mas isso só deve
   ser feito depois que "Servidor Valida: Sim" estiver validado e estável.
 
+## Colaboradores vs alunos (colisão de id)
+
+- A catraca facial também é usada por **colaboradores** (professores,
+  recepção etc.), não só alunos. O device não distingue — qualquer `enrollid`
+  que aparece no `sendlog` é importado em `CatracaAluno` como se fosse aluno.
+- **Descoberta importante**: as tabelas de `members` (`idMember`) e
+  `employees` (`idEmployee`) na EVO numeram independentemente a partir de 1,
+  então **enrollids baixos colidem com frequência** entre um aluno real e um
+  colaborador real — os dois nomes podem ser genuínos, não dá pra usar
+  "nome anonimizado" nem nenhuma heurística de API pra desambiguar sozinho.
+  Exemplos confirmados: enrollid 54 = aluna inativa "Gabriella Queiroz Jara"
+  **e** professor ativo "Pedro Vieira Sousa Neto"; enrollid 540 = contrato de
+  aluno anonimizado (LGPD) **e** colaboradora ativa; enrollid 549 = perfil de
+  membro antigo anonimizado **e** professor ativo.
+- **Solução adotada**: campo `tipo` (`"aluno"` | `"colaborador"`) em
+  `CatracaAluno`, e uma lista manual fornecida pelo dono da academia —
+  `src/catraca/colaboradores-conhecidos.ts` — que tem **prioridade sobre
+  qualquer detecção automática** (`buscarNomeEStatusPorIdMember` em
+  `evo-aluno-busca.ts` checa essa lista primeiro, antes de contrato/perfil).
+  Pra atualizar a lista: pedir um novo CSV de colaboradores (exportado da
+  EVO) e regerar o arquivo.
+- `evo-sync-job.ts` sincroniza `ativo` separadamente por `tipo`: alunos
+  contra `/api/v1/members/active-members`, colaboradores contra
+  `/api/v2/employees` (`fetchIdEmployeesAtivos` em `evo-active-members.ts`) —
+  **isso é o comportamento certo mesmo se parecer "desfazer" a lista
+  manual**: a lista manual só fixa a classificação (aluno x colaborador), o
+  `ativo` continua acompanhando o status real e atual na EVO (confirmado:
+  colaborador que o CSV dizia "Ativo" apareceu "Bloqueado" na consulta ao
+  vivo dias depois — está correto barrar, não é bug).
+
+## Wellhub/Gympass (check-in libera mesmo com "inativo" na EVO)
+
+- Alunos que usam Wellhub/Gympass ficam **inativos** na EVO (sem contrato
+  direto) mas devem ser liberados na catraca quando fazem check-in pelo app,
+  só naquela janela de tempo — não dá pra cachear isso como o `ativo` normal
+  (sincronizado a cada 10 min).
+- **A EVO já integra Wellhub/Gympass e Totalpass por trás de um único
+  endpoint**: `POST /api/v2/accessControl/entryAuthorize` (`id`, `personType`
+  — 1 aluno/3 colaborador —, `device` — 3 é facial —, `idTurnstile`). Não
+  precisamos falar com a API do Wellhub diretamente. O retorno já cobre os
+  dois cenários (`blockedtype` tem códigos específicos pra Gympass 19-25 e
+  Totalpass 30-35).
+- Catraca já cadastrada na EVO pra isso: `idTurnstile: 8` ("Catraca Topdata
+  Facial Browser - Quattor"), salvo em `EVO_ID_TURNSTILE_FACIAL` no `.env`.
+- **Implementado** em `evo-access-control.ts` + `access-handler.ts`: quando
+  o cache local diz "inativo", confirma com esse endpoint antes de negar de
+  vez (falha (rede/permissão) → mantém a decisão local, nunca trava nem
+  libera por engano).
+- **Bloqueado por permissão da EVO**: testado contra os dois turnstiles
+  cadastrados (2 e 8), os dois retornam **HTTP 500 vazio**. Suspeita: falta
+  habilitar a permissão "Controle Acesso - Consulta" na chave de integração
+  da EVO (ou os turnstiles não estão totalmente configurados do lado da EVO
+  — os dois têm `serialNumber` vazio/nulo). Precisa verificar no painel
+  admin da EVO ou com o suporte deles antes de conseguir validar de verdade.
+
+## Wellhub direto (independente da EVO)
+
+- **Decisão**: o dono da academia quer parar de depender da EVO no futuro, e
+  o `entryAuthorize` dela (que embrulha Wellhub/Totalpass) segue bloqueado
+  por permissão (ver seção acima). Solução: falar direto com a **Access
+  Control API** da própria Wellhub, sem passar pela EVO.
+- **Endpoint**: `POST https://api.partners.gympass.com/access/v1/validate`
+  (sandbox: `https://apitesting.partners.gympass.com/access/v1`). Headers
+  `Authorization: Bearer {token}` + `X-Gym-Id: {gymId}`, body
+  `{"gympass_id": "..."}`. `200` vazio = check-in confirmado; erros
+  conhecidos: "Check-In not found in database", "Check-In already
+  validated", "Check-In expired". Check-in expira **30 min** depois de
+  criado no app — precisa validar dentro dessa janela.
+- **Modelo escolhido**: "Gate System Trigger" (chamamos `/validate` quando a
+  própria facial já decidiu liberar fisicamente), não o "Automated Trigger"
+  (ficar ouvindo o webhook de check-in da Wellhub) — schema mais simples e
+  já bate com o fluxo existente (`decidirAcesso` em `access-handler.ts`).
+- **Implementado** em `wellhub-access-control.ts` (`validarCheckInWellhub`,
+  mesmo padrão defensivo do `evo-access-control.ts`: retorna `null` — não
+  nega — se faltar credencial ou a chamada falhar) + campo `wellhubId` em
+  `CatracaAluno` + rota `PATCH /catraca/alunos/:idMember/wellhub-id` pra
+  cadastrar manualmente. `decidirAcesso` tenta Wellhub primeiro quando o
+  aluno tem `wellhubId`, senão cai no fallback EVO de sempre.
+- **Pendências antes de funcionar de verdade**:
+  1. **Credenciais** (`WELLHUB_ACCESS_TOKEN`, `WELLHUB_GYM_ID`) — ainda não
+     solicitadas. Pedir ao Tech Sales da Wellhub
+     (`integrations@gympass.com`) ou via Help Center ("solicitar token de
+     integração da academia").
+  2. **Origem do `gympass_id` por aluno** — **resolvido, dá pra fazer em
+     lote**: a EVO tem um **relatório de check-ins Wellhub** exportável em
+     CSV (colunas `ID` = idMember, `ID Agregador` = gympass_id, entre
+     outras) — não achamos endpoint de API pra isso (`GET /api/v2/members/
+     {idMember}` não retorna esse campo, testado contra idMember 18684),
+     mas o relatório exportado manualmente do painel resolve. Processado em
+     2026-07-09: 6089 linhas de check-in → 448 `idMember` únicos → 436
+     batidos com alunos já cadastrados no `CatracaAluno` (12 não encontrados
+     ainda, provavelmente não descobertos via `sendlog`). 2 conflitos (aluno
+     com dois gympass_id diferentes ao longo do histórico — resolvido pelo
+     mais frequente). Script reaproveitável em `scripts/import-wellhub-csv.ts`
+     (`npx tsx scripts/import-wellhub-csv.ts /caminho/wellhub.csv`). Pra
+     atualizar de novo no futuro: pedir novo export do mesmo relatório na
+     EVO e rerodar.
+
+## Migração do MongoDB: Atlas → EasyPanel (self-hosted)
+
+- Em 2026-07-09 o banco saiu do Atlas (`cluster0.lg36a.mongodb.net`) pra um
+  Mongo self-hosted no EasyPanel (`easypanel.quattoracademia.com:27017`,
+  serviço `mongodb` dentro do projeto `n8n_quattor` — reaproveitando um Mongo
+  que já existia lá pro n8n). Motivo: decisão do usuário, `recepcao` não usa
+  os dados da catraca, então não tem problema de "banco compartilhado" que
+  achávamos que existia antes (ver [[catraca-api-overview]] — checar se essa
+  memória precisa de correção).
+- **Pegadinha que quebrou tudo na primeira tentativa**: o Mongo do EasyPanel
+  por padrão **não roda como replica set**, e o Prisma exige isso (usa
+  transação por baixo até pra updates simples) — sem isso, `evo-sync-job.ts`
+  (job periódico de `ativo`) falhava com `P2031`. Corrigido:
+  1. No serviço Mongo do EasyPanel, campo "Comando" → `mongod --replSet rs0 --bind_ip_all`.
+  2. Console do serviço → `mongo client` → `rs.initiate()`.
+  3. **Outra pegadinha**: `rs.initiate()` sem argumento registra o member
+     com o **hostname interno do container Docker** (tipo `4e02c958be28:27017`),
+     não o domínio externo — isso quebra conexões de fora assim que o driver
+     tenta redirecionar pro host "oficial" do replica set. Corrigir com:
+     ```
+     cfg = rs.conf()
+     cfg.members[0].host = "easypanel.quattoracademia.com:27017"
+     rs.reconfig(cfg, {force: true})
+     ```
+  4. String de conexão final precisa de `authSource=admin` (usuário foi
+     criado no banco `admin`, não no `quattor`) e `replicaSet=rs0`:
+     `mongodb://usuario:senha@easypanel.quattoracademia.com:27017/quattor?tls=false&authSource=admin&replicaSet=rs0`
+- Antes de trocar o `.env` de vez, validado que a cópia de dados (feita pelo
+  usuário, fora do nosso controle) bateu 100% com o Atlas: 4398 alunos, 1026
+  ativos, 1570 com `wellhubId`, 69 logs, 22158 `EvoCliente` — todos iguais
+  nos dois bancos antes da troca.
+
 ## Bugs/gotchas encontrados
 
 - **Prisma + MongoDB**: campo `DateTime?` (ex.: `removidoEm`) que nunca foi
@@ -108,17 +238,28 @@ confirmado observando tráfego real:
   mantém atualizados): `Basic base64(EVO_USER:EVO_SECRET)`.
 - **API da EVO tem rate limit agressivo** (poucas chamadas seguidas já dão
   erro) — o enriquecimento de nomes espaça as chamadas em ~400ms
-  (`enriquecer-nomes-evo.ts`).
+  (`enriquecer-nomes-evo.ts`). Editar código enquanto uma rodada de
+  enriquecimento está rodando **reinicia o `tsx watch` e mata a rodada no
+  meio** (progresso não persiste, é só em memória) — evitar editar arquivos
+  com uma rodada em andamento.
+- **`/catraca/acessos` e `/catraca/acessos/ultimo` mostravam o nome errado**:
+  usavam o nome cru vindo do próprio `sendlog` do device (`CatracaAcessoLog.
+  nome`), que quase sempre vem vazio, em vez do nome já enriquecido em
+  `CatracaAluno`. Corrigido pra preferir o nome enriquecido (`routes.ts`).
 
 ## Estado no fim desta sessão
 
-- ~4000 alunos descobertos/importados (de ~4378 cadastrados no device),
-  crescendo sozinho conforme o device manda `senduser`.
-- Boa parte já com foto real (veio do device, sem precisar da recepção
-  capturar nada).
-- Enriquecimento de nome via EVO rodou uma primeira leva completa (962
-  processados); os descobertos depois disso ainda precisam de uma nova
-  rodada (`POST /catraca/enriquecer-nomes`).
+- ~4400 alunos descobertos/importados, crescendo sozinho conforme o device
+  manda `senduser`/backlog. Quase todos já com foto real (só ~1 sem, na
+  última checagem).
+- Enriquecimento de nome via EVO rodou várias rodadas (`POST /catraca/
+  enriquecer-nomes`); ainda sobra bastante gente sem nome — rodar de novo
+  periodicamente até estabilizar (ver `GET /catraca/enriquecer-nomes` pro
+  progresso).
+- 101 colaboradores conhecidos aplicados via `colaboradores-conhecidos.ts`
+  (ver seção acima) — cobre os casos de colisão de id encontrados até agora,
+  mas pode aparecer gente nova (avisar se algum colaborador aparecer com
+  status/nome errado no monitor).
 - Projeto extraído do monorepo `recepcao` pra cá (`catraca-api`), enxuto,
   sem as dependências do app web — pensado pra rodar num PC mais fraco sem
   Docker (ver README).
@@ -128,7 +269,12 @@ confirmado observando tráfego real:
 1. Terminar de importar/enriquecer o resto do cadastro.
 2. Decidir e implementar o comportamento pra `enrollid` desconhecido antes
    de ligar validação real (negar vs. liberar-e-logar).
-3. Ligar `Servidor Valida: Sim` no menu do leitor facial.
-4. Validar `setuserinfo` (cadastro manual) contra o device real de verdade.
-5. Só depois de tudo validado e estável: conversar sobre desativar o
+3. **Verificar com a EVO (painel admin ou suporte) a permissão "Controle
+   Acesso - Consulta" na chave de integração** — `entryAuthorize` (Wellhub/
+   Gympass, ver seção acima) está implementado mas retorna HTTP 500 vazio
+   pros dois turnstiles cadastrados; sem isso, quem faz check-in Wellhub
+   continua sendo negado quando ligarmos validação real.
+4. Ligar `Servidor Valida: Sim` no menu do leitor facial.
+5. Validar `setuserinfo` (cadastro manual) contra o device real de verdade.
+6. Só depois de tudo validado e estável: conversar sobre desativar o
    sistema antigo da EVO em `192.168.1.12`.

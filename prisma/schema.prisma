@@ -11,8 +11,10 @@ datasource db {
 // coleções pertencem à catraca; o resto do banco não é tocado daqui.
 model CatracaAluno {
     id           String    @id @default(auto()) @map("_id") @db.ObjectId
-    idMember     Int       @unique // idMember da EVO, reusado como enrollid no device
+    idMember     Int       @unique // idMember (aluno) ou idEmployee (colaborador) da EVO, reusado como enrollid no device
     nome         String?
+    tipo         String    @default("aluno") // "aluno" | "colaborador" — define contra qual API da EVO sincronizar o `ativo`
+    wellhubId    String? // gympass_id do aluno na Wellhub, preenchido manualmente — usado pra validar check-in direto na API da Wellhub quando `ativo` é false
     fotoBase64   String? // vem do próprio device (senduser) ou capturada na recepção
     ativo        Boolean   @default(true) // sincronizado pelo job periódico de status EVO
     enroladoEm   DateTime  @default(now())
@@ -20,6 +22,68 @@ model CatracaAluno {
     removidoEm   DateTime?
 
     @@index([ativo])
+}
+
+// Cadastro completo puxado de GET /api/v2/members (EVO) — coleção separada
+// da CatracaAluno (que é enxuta, só o necessário pra decisão de acesso).
+// Populada por `scripts/sync-evo-clientes.ts` / `POST /catraca/sincronizar-clientes`.
+model EvoCliente {
+    id                          String    @id @default(auto()) @map("_id") @db.ObjectId
+    idMember                    Int       @unique
+    firstName                   String?
+    lastName                    String?
+    registerName                String?
+    registerLastName            String?
+    registerDate                DateTime?
+    idBranch                    Int?
+    branchName                  String?
+    accessBlocked               Boolean?
+    blockedReason               String?
+    document                    String?
+    documentId                  String?
+    maritalStatus               String?
+    gender                      String?
+    birthDate                   DateTime?
+    updateDateEvo               DateTime? // `updateDate` da EVO — nome diferente do nosso `atualizadoEm` (@updatedAt) pra não confundir
+    address                     String?
+    state                       String?
+    city                        String?
+    zipCode                     String?
+    complement                  String?
+    neighborhood                String?
+    accessCardNumber            String?
+    number                      String?
+    totalFitCoins                Int?
+    membershipStatus            String?
+    penalized                   Boolean?
+    status                      String?
+    email                       String? // extraído de contacts[] (contactType == "E-mail")
+    telefone                    String? // extraído de contacts[] (contactType == "Cellphone")
+    lastAccessDate              DateTime?
+    conversionDate              DateTime?
+    idEmployeeConsultant         Int?
+    nameEmployeeConsultant       String?
+    idEmployeeInstructor         Int?
+    nameEmployeeInstructor       String?
+    idEmployeePersonalTrainer    Int?
+    nameEmployeePersonalTrainer  String?
+    photoUrl                    String?
+    country                     String?
+    idMemberMigration            String?
+    gympassId                   String? // mesmo dado replicado em CatracaAluno.wellhubId, pra não acoplar a decisão de acesso a esta coleção
+    personalTrainer             Boolean?
+    personalType                String?
+    cref                        String?
+    crefExpirationDate          DateTime?
+    codeTotalpass               String?
+    userIdGurupass              String?
+    clientWithPromotionalRestriction Boolean?
+    raw                         Json? // payload bruto da EVO, pra campos que ainda não mapeamos explicitamente
+    sincronizadoEm              DateTime  @default(now())
+    atualizadoEm                DateTime  @updatedAt
+
+    @@index([gympassId])
+    @@index([document])
 }
 
 model CatracaAcessoLog {

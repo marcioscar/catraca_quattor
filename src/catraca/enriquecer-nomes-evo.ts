@@ -44,7 +44,7 @@ export async function enriquecerNomesEvo(): Promise<void> {
         if (resultado?.nome) {
           await db.catracaAluno.update({
             where: { idMember: aluno.idMember },
-            data: { nome: resultado.nome, ativo: resultado.ativo },
+            data: { nome: resultado.nome, ativo: resultado.ativo, tipo: resultado.tipo },
           });
         }
       } catch (error) {
