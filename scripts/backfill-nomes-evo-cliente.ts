@@ -26,7 +26,9 @@ function lerDatabaseUrl(): string {
 async function main() {
   const db = new PrismaClient({ datasources: { db: { url: lerDatabaseUrl() } } });
 
-  const semNome = await db.catracaAluno.findMany({ where: { OR: [{ nome: null }, { nome: "" }] } });
+  const semNome = await db.catracaAluno.findMany({
+    where: { OR: [{ nome: null }, { nome: "" }, { nome: { isSet: false } }] },
+  });
 
   let viaColaborador = 0;
   let viaEvoCliente = 0;

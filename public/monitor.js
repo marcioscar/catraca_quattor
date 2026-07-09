@@ -8,9 +8,13 @@ const horarioEl = document.getElementById("horario");
 
 const ROTULOS = {
   ok: "Acesso liberado",
+  wellhub_ok: "Acesso liberado — Wellhub",
+  wellhub_provisorio: "Acesso liberado — Wellhub (provisório)",
   plano_inativo: "Plano inativo — negado",
   nao_cadastrado: "Não cadastrado — negado",
 };
+
+const MOTIVOS_WELLHUB = new Set(["wellhub_ok", "wellhub_provisorio"]);
 
 let ultimoIdMostrado = null;
 
@@ -33,7 +37,14 @@ function mostrarAcesso(acesso) {
 
   resultadoEl.textContent = ROTULOS[acesso.motivo] ?? (acesso.permitido ? "Liberado" : "Negado");
   nomeEl.textContent = acesso.nome || `Membro ${acesso.idMember}`;
-  detalheEl.textContent = `ID ${acesso.idMember}${acesso.ativo === false ? " · plano inativo na EVO" : ""}`;
+
+  let extra = "";
+  if (MOTIVOS_WELLHUB.has(acesso.motivo)) {
+    extra = " · via Wellhub";
+  } else if (acesso.ativo === false) {
+    extra = " · plano inativo na EVO";
+  }
+  detalheEl.textContent = `ID ${acesso.idMember}${extra}`;
   horarioEl.textContent = formatHorario(acesso.ocorridoEm);
 
   if (acesso.fotoBase64) {

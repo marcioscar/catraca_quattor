@@ -6,7 +6,7 @@ import type { SendLogMessage, SendLogRecord } from "./protocol.js";
 export interface AccessDecision {
   enrollid: number;
   access: boolean;
-  motivo: "ok" | "plano_inativo" | "nao_cadastrado" | "wellhub_provisorio";
+  motivo: "ok" | "plano_inativo" | "nao_cadastrado" | "wellhub_provisorio" | "wellhub_ok";
 }
 
 /** Registros mais antigos que isso são backlog acumulado (reader ficou
@@ -53,7 +53,7 @@ async function decidirAcesso(enrollid: number): Promise<AccessDecision> {
     }
     const autorizacaoWellhub = await validarCheckInWellhub(aluno.wellhubId);
     if (autorizacaoWellhub?.autorizado) {
-      return { enrollid, access: true, motivo: "ok" };
+      return { enrollid, access: true, motivo: "wellhub_ok" };
     }
   }
 

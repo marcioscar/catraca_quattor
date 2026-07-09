@@ -33,7 +33,7 @@ export async function enriquecerNomesEvo(): Promise<void> {
 
   try {
     const alunos = await db.catracaAluno.findMany({
-      where: { AND: [{ OR: [{ nome: null }, { nome: "" }] }, NAO_REMOVIDO] },
+      where: { AND: [{ OR: [{ nome: null }, { nome: "" }, { nome: { isSet: false } }] }, NAO_REMOVIDO] },
       select: { idMember: true },
     });
     progresso.total = alunos.length;

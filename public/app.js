@@ -62,7 +62,13 @@ async function carregarAlunos() {
 async function carregarAcessos() {
   const resposta = await fetch("/catraca/acessos?take=50");
   const acessos = await resposta.json();
-  const rotulos = { ok: "Liberado", plano_inativo: "Plano inativo", nao_cadastrado: "Não cadastrado" };
+  const rotulos = {
+    ok: "Liberado",
+    wellhub_ok: "Liberado — Wellhub",
+    wellhub_provisorio: "Liberado — Wellhub (provisório)",
+    plano_inativo: "Plano inativo",
+    nao_cadastrado: "Não cadastrado",
+  };
   tabelaAcessosBody.innerHTML = "";
   for (const acesso of acessos) {
     const tr = document.createElement("tr");
