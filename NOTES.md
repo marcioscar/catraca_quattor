@@ -350,7 +350,18 @@ nssm remove CatracaApi confirm
    Acesso - Consulta" na chave de integração** — `entryAuthorize` (Wellhub/
    Gympass, ver seção acima) está implementado mas retorna HTTP 500 vazio
    pros dois turnstiles cadastrados; sem isso, quem faz check-in Wellhub
-   continua sendo negado quando ligarmos validação real.
+   continua sendo negado quando ligarmos validação real. **Esse mesmo
+   bloqueio também impede registrar presença/frequência na EVO** (testado em
+   2026-07-10): existe `POST /api/v2/accessControl/insertManualLiberation`
+   (funciona, cria o registro e devolve `idManualLiberation`), mas ele
+   sozinho **não gera uma entrada de verdade** no relatório de frequência —
+   o fluxo correto é passar esse `idManualLiberation` de volta pro
+   `entryAuthorize` via `idManualEntry`, e é esse segundo passo que trava
+   com o mesmo 500. Não implementar registro de presença antes desse
+   bloqueio ser resolvido (deixaria só `insertManualLiberation` órfão
+   rodando, poluindo o relatório de "liberações manuais" da EVO sem nunca
+   virar uma entrada de verdade — decisão do usuário, ver conversa de
+   2026-07-10).
 4. Ligar `Servidor Valida: Sim` no menu do leitor facial.
 5. Validar `setuserinfo` (cadastro manual) contra o device real de verdade.
 6. Só depois de tudo validado e estável: conversar sobre desativar o

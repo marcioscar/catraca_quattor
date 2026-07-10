@@ -7,6 +7,8 @@ export interface AccessDecision {
   enrollid: number;
   access: boolean;
   motivo: "ok" | "plano_inativo" | "nao_cadastrado" | "wellhub_provisorio" | "wellhub_ok";
+  /** Só presente quando access=true — gravado no log pra sincronizar com a EVO depois (ver NOTES.md). */
+  personType?: number;
 }
 
 /** Registros mais antigos que isso são backlog acumulado (reader ficou
@@ -43,24 +45,26 @@ async function decidirAcesso(enrollid: number): Promise<AccessDecision> {
   if (!aluno) {
     return { enrollid, access: false, motivo: "nao_cadastrado" };
   }
+
+  const personType = aluno.tipo === "colaborador" ? PERSON_TYPE_COLABORADOR : PERSON_TYPE_CLIENTE;
+
   if (aluno.ativo) {
-    return { enrollid, access: true, motivo: "ok" };
+    return { enrollid, access: true, motivo: "ok", personType };
   }
 
   if (aluno.wellhubId) {
     if (!wellhubConfigurado()) {
-      return { enrollid, access: true, motivo: "wellhub_provisorio" };
+      return { enrollid, access: true, motivo: "wellhub_provisorio", personType };
     }
     const autorizacaoWellhub = await validarCheckInWellhub(aluno.wellhubId);
     if (autorizacaoWellhub?.autorizado) {
-      return { enrollid, access: true, motivo: "wellhub_ok" };
+      return { enrollid, access: true, motivo: "wellhub_ok", personType };
     }
   }
 
-  const personType = aluno.tipo === "colaborador" ? PERSON_TYPE_COLABORADOR : PERSON_TYPE_CLIENTE;
   const autorizacao = await autorizarEntradaEvo(enrollid, personType);
   if (autorizacao?.autorizado) {
-    return { enrollid, access: true, motivo: "ok" };
+    return { enrollid, access: true, motivo: "ok", personType };
   }
 
   return { enrollid, access: false, motivo: "plano_inativo" };
@@ -84,6 +88,7 @@ export async function handleSendLog(message: SendLogMessage): Promise<AccessDeci
         nome: record.name ?? null,
         permitido: decisao.access,
         motivo: decisao.motivo,
+        personType: decisao.personType ?? null,
       },
     });
   }

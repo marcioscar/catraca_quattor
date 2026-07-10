@@ -91,9 +91,16 @@ model CatracaAcessoLog {
     idMember   Int // == enrollid recebido no sendlog
     nome       String?
     permitido  Boolean
-    motivo     String? // "ok" | "plano_inativo" | "nao_cadastrado"
+    motivo     String? // "ok" | "plano_inativo" | "nao_cadastrado" | "wellhub_provisorio" | "wellhub_ok"
+    personType Int? // 1=Aluno, 3=Funcionário (EVO) — só setado quando permitido=true, pra sincronizar depois
     ocorridoEm DateTime @default(now())
+
+    // Entrada ainda não registrada na EVO (bloqueado hoje por permissão — ver NOTES.md
+    // "Próximos passos" item 3). Só relevante quando permitido=true. Quando o bloqueio for
+    // resolvido, um job de sincronização retroativa processa quem estiver com isso em false.
+    sincronizadoEvo Boolean @default(false)
 
     @@index([idMember])
     @@index([ocorridoEm])
+    @@index([sincronizadoEvo])
 }
