@@ -23,6 +23,19 @@ function lerDatabaseUrl(): string {
   return linha.slice("DATABASE_URL=".length).trim().replace(/^"|"$/g, "");
 }
 
+/** Timeouts de conexão com o Mongo remoto são transitórios — tenta de novo antes de desistir do registro. */
+async function comRetentativa<T>(fn: () => Promise<T>, tentativas = 3): Promise<T> {
+  for (let i = 1; i <= tentativas; i++) {
+    try {
+      return await fn();
+    } catch (error) {
+      if (i === tentativas) throw error;
+      await new Promise((resolve) => setTimeout(resolve, 500 * i));
+    }
+  }
+  throw new Error("inalcançável");
+}
+
 async function main() {
   const db = new PrismaClient({ datasources: { db: { url: lerDatabaseUrl() } } });
 
@@ -33,30 +46,40 @@ async function main() {
   let viaColaborador = 0;
   let viaEvoCliente = 0;
   let semDadoLocal = 0;
+  let falhas = 0;
 
   for (const aluno of semNome) {
-    const colaborador = getColaboradorConhecido(aluno.idMember);
-    if (colaborador) {
-      await db.catracaAluno.update({
-        where: { idMember: aluno.idMember },
-        data: { nome: colaborador.nome, tipo: "colaborador", ativo: colaborador.status.toLowerCase() === "ativo" },
-      });
-      viaColaborador += 1;
-      continue;
-    }
+    try {
+      const colaborador = getColaboradorConhecido(aluno.idMember);
+      if (colaborador) {
+        await comRetentativa(() =>
+          db.catracaAluno.update({
+            where: { idMember: aluno.idMember },
+            data: { nome: colaborador.nome, tipo: "colaborador", ativo: colaborador.status.toLowerCase() === "ativo" },
+          })
+        );
+        viaColaborador += 1;
+        continue;
+      }
 
-    const cliente = await db.evoCliente.findUnique({ where: { idMember: aluno.idMember } });
-    const nome = cliente ? [cliente.firstName, cliente.lastName].filter(Boolean).join(" ").trim() : "";
-    if (cliente && nome) {
-      await db.catracaAluno.update({
-        where: { idMember: aluno.idMember },
-        data: { nome, tipo: "aluno", ativo: cliente.status === "Active" },
-      });
-      viaEvoCliente += 1;
-      continue;
-    }
+      const cliente = await comRetentativa(() => db.evoCliente.findUnique({ where: { idMember: aluno.idMember } }));
+      const nome = cliente ? [cliente.firstName, cliente.lastName].filter(Boolean).join(" ").trim() : "";
+      if (cliente && nome) {
+        await comRetentativa(() =>
+          db.catracaAluno.update({
+            where: { idMember: aluno.idMember },
+            data: { nome, tipo: "aluno", ativo: cliente.status === "Active" },
+          })
+        );
+        viaEvoCliente += 1;
+        continue;
+      }
 
-    semDadoLocal += 1;
+      semDadoLocal += 1;
+    } catch (error) {
+      falhas += 1;
+      console.error(`[backfill] erro no idMember=${aluno.idMember} (rode o script de novo pra retomar):`, error);
+    }
   }
 
   console.log(
@@ -66,6 +89,7 @@ async function main() {
         viaColaborador,
         viaEvoCliente,
         semDadoLocal, // esses precisam de enriquecer-nomes-evo.ts (API ao vivo) ou não existem na EVO
+        falhas, // erro persistente após retentativas — rode o script de novo pra tentar de novo
       },
       null,
       2

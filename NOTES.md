@@ -246,6 +246,20 @@ confirmado observando tráfego real:
   usavam o nome cru vindo do próprio `sendlog` do device (`CatracaAcessoLog.
   nome`), que quase sempre vem vazio, em vez do nome já enriquecido em
   `CatracaAluno`. Corrigido pra preferir o nome enriquecido (`routes.ts`).
+- **O mesmo gotcha de `isSet: false` acima também afetava o campo `nome`**
+  (2026-07-10): os scripts de enriquecimento (`enriquecer-nomes-evo.ts`,
+  `backfill-nomes-evo-cliente.ts`) filtravam só `{ nome: null }`/`""`, sem
+  `isSet: false` — perdiam ~2800 `CatracaAluno` criados pelo `senduser` do
+  device sem o campo `nome` gravado (não null, ausente mesmo). Corrigido nos
+  dois scripts.
+- **`prisma db push` nunca tinha sido rodado contra o Mongo do EasyPanel**
+  (2026-07-10): nenhum índice do schema existia de fato no banco, nem os
+  `@unique` (só o `_id_` padrão). Isso permitiu 3 documentos duplicados de
+  `CatracaAluno` pro mesmo `idMember` (22343, reenvios repetidos de
+  `senduser` em ~40s) — limpo manualmente, e `npx prisma db push` rodado pra
+  aplicar os índices reais. Rodar `db push` de novo depois de qualquer
+  mudança de schema em produção (não só `db:generate`, que só gera o client
+  TS e não sincroniza índices/constraints com o banco).
 
 ## Estado no fim desta sessão
 
