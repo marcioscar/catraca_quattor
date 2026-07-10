@@ -261,6 +261,69 @@ confirmado observando tráfego real:
   mudança de schema em produção (não só `db:generate`, que só gera o client
   TS e não sincroniza índices/constraints com o banco).
 
+## Operação no PC da catraca (Windows, serviço `CatracaApi` via NSSM)
+
+Instalado em 2026-07-09 em `C:\catraca-api`, sem Docker, rodando como
+serviço do Windows (NSSM) — sobe sozinho no boot e reinicia se cair. Ver
+seção "Migração do MongoDB" e [[catraca-api-proximos-passos]] pro contexto:
+esse é o mesmo PC (`192.168.1.12`) que já roda o sistema antigo da EVO
+controlando a roleta, os dois convivem até o novo ser validado.
+
+**Atualizar o app com uma versão nova do código** (PowerShell como
+Administrador):
+```powershell
+cd C:\catraca-api
+nssm stop CatracaApi
+git pull
+npm install
+npx prisma generate
+npm run build
+nssm start CatracaApi
+nssm status CatracaApi
+```
+Sempre parar o serviço **antes** do `prisma generate`/`build` — o Windows
+não deixa sobrescrever os arquivos do Prisma enquanto o processo do serviço
+está com eles abertos (erro `EPERM ... rename query_engine-windows.dll`).
+
+**Comandos do serviço:**
+```powershell
+nssm status CatracaApi     # ver se está rodando
+nssm restart CatracaApi    # reiniciar sem trocar código
+nssm stop CatracaApi
+nssm start CatracaApi
+```
+Também dá pra ver/mexer em `services.msc`, procurando "CatracaApi".
+
+**Ver logs** (setados em `AppStdout`/`AppStderr` na instalação):
+```powershell
+Get-Content C:\catraca-api\logs\out.log -Tail 50 -Wait
+Get-Content C:\catraca-api\logs\err.log -Tail 50 -Wait
+```
+`-Wait` deixa acompanhando em tempo real (Ctrl+C pra sair).
+
+**Checar se está de pé:**
+```powershell
+curl http://localhost:3001/health
+```
+Deve responder `{"status":"ok","alunos":N}`. Também dá pra abrir no
+navegador: `http://localhost:3001/` (cadastro) e `http://localhost:3001/
+monitor.html` (monitor ao vivo).
+
+**Se mudar `schema.prisma`** (campo novo, índice novo): além do fluxo acima,
+rodar `npx prisma db push` (com o serviço parado) pra sincronizar os
+índices/constraints de verdade no Mongo — `db:generate`/`build` sozinhos
+**não** fazem isso (ver "Bugs/gotchas encontrados" acima, causou duplicidade
+de registro em 2026-07-10).
+
+**Portas usadas** (já liberadas no Firewall do Windows): `3001` (HTTP,
+cadastro/monitor) e `7792` (WS, leitor facial — `CATRACA_WS_PORT` no `.env`).
+
+**Desinstalar o serviço** (só se for reinstalar do zero):
+```powershell
+nssm stop CatracaApi
+nssm remove CatracaApi confirm
+```
+
 ## Estado no fim desta sessão
 
 - ~4400 alunos descobertos/importados, crescendo sozinho conforme o device
