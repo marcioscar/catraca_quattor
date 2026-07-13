@@ -1,6 +1,7 @@
 /**
  * Diagnóstico rápido de um idMember específico: mostra o que está salvo em
- * CatracaAluno, EvoCliente e na lista de colaboradores conhecidos.
+ * CatracaAluno, EvoCliente, colaboradores conhecidos, e os últimos acessos
+ * registrados em CatracaAcessoLog.
  *
  * Uso: npx tsx scripts/check-idmember.ts 24418
  */
@@ -24,10 +25,15 @@ async function main() {
   const aluno = await db.catracaAluno.findUnique({ where: { idMember } });
   const cliente = await db.evoCliente.findUnique({ where: { idMember } });
   const colaborador = getColaboradorConhecido(idMember);
+  const acessos = await db.catracaAcessoLog.findMany({
+    where: { idMember },
+    orderBy: { ocorridoEm: "desc" },
+    take: 5,
+  });
 
   const alunoSemFoto = aluno ? { ...aluno, fotoBase64: aluno.fotoBase64 ? "[omitido]" : null } : null;
 
-  console.log(JSON.stringify({ aluno: alunoSemFoto, cliente, colaborador }, null, 2));
+  console.log(JSON.stringify({ aluno: alunoSemFoto, cliente, colaborador, acessos }, null, 2));
 
   await db.$disconnect();
   process.exit(0);
