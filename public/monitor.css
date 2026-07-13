@@ -128,9 +128,34 @@ h1#nome {
 }
 
 .grade-titulo,
-.grade-lista {
+.grade-lista,
+.contador-hoje {
   position: relative;
   z-index: 1;
+}
+
+.contador-hoje {
+  position: absolute;
+  top: 48px;
+  right: 64px;
+  text-align: right;
+  color: white;
+}
+
+.contador-hoje-valor {
+  display: block;
+  font-size: 3rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.contador-hoje-rotulo {
+  display: block;
+  font-size: 0.9rem;
+  opacity: 0.7;
+  margin-top: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 .grade-titulo {

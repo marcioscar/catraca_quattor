@@ -1,6 +1,7 @@
 const telaDetalheEl = document.getElementById("tela-detalhe");
 const telaGradeEl = document.getElementById("tela-grade");
 const gradeListaEl = document.getElementById("grade-lista");
+const contadorHojeValorEl = document.getElementById("contador-hoje-valor");
 
 const fotoEl = document.getElementById("foto");
 const avatarEl = document.getElementById("avatar");
@@ -127,6 +128,16 @@ async function carregarGrade() {
   }
 }
 
+async function atualizarContadorHoje() {
+  try {
+    const resposta = await fetch("/catraca/acessos/contagem-hoje");
+    const dados = await resposta.json();
+    contadorHojeValorEl.textContent = typeof dados.total === "number" ? dados.total : "—";
+  } catch {
+    // Silencioso — só tenta de novo no próximo ciclo.
+  }
+}
+
 async function verificarNovoAcesso() {
   try {
     const resposta = await fetch("/catraca/acessos/ultimo");
@@ -144,10 +155,12 @@ async function verificarNovoAcesso() {
 }
 
 mostrarTelaGrade();
+atualizarContadorHoje();
 verificarNovoAcesso();
 setInterval(verificarNovoAcesso, INTERVALO_POLL_MS);
 setInterval(() => {
   if (telaGradeEl.classList.contains("ativa")) {
     carregarGrade();
+    atualizarContadorHoje();
   }
 }, INTERVALO_ATUALIZA_GRADE_MS);

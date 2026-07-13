@@ -197,4 +197,15 @@ export async function catracaRoutes(app: FastifyInstance): Promise<void> {
       ativo: aluno?.ativo ?? null,
     };
   });
+
+  // Contador do dia pro monitor — entradas liberadas desde a meia-noite (hora local do servidor).
+  app.get("/catraca/acessos/contagem-hoje", async () => {
+    const inicioDoDia = new Date();
+    inicioDoDia.setHours(0, 0, 0, 0);
+
+    const total = await db.catracaAcessoLog.count({
+      where: { ocorridoEm: { gte: inicioDoDia }, permitido: true },
+    });
+    return { total };
+  });
 }
