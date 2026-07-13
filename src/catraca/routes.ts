@@ -2,7 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { db } from "../db.js";
 import { enrollAluno, removeAluno } from "./enroll-service.js";
 import { isConnected, getLastSeenAt, send } from "./connection-manager.js";
-import { buscarAlunoEvo } from "./evo-aluno-busca.js";
+import { buscarAlunoEvo, buscarColaboradorEvo } from "./evo-aluno-busca.js";
 import { enriquecerNomesEvo, getProgressoEnriquecimento } from "./enriquecer-nomes-evo.js";
 import { sincronizarClientesEvo, getProgressoSincronizacaoClientes } from "./evo-clientes-sync.js";
 import { NAO_REMOVIDO } from "./filtros.js";
@@ -11,6 +11,7 @@ interface EnrollBody {
   idMember?: number;
   nome?: string;
   fotoBase64?: string;
+  tipo?: string;
 }
 
 export async function catracaRoutes(app: FastifyInstance): Promise<void> {
@@ -20,9 +21,10 @@ export async function catracaRoutes(app: FastifyInstance): Promise<void> {
   }));
 
   app.get("/catraca/busca", async (request, reply) => {
-    const query = request.query as { termo?: string; idMember?: string };
+    const query = request.query as { termo?: string; idMember?: string; tipo?: string };
     const termo = query.termo?.trim() ?? "";
     const idMember = query.idMember ? Number(query.idMember) : undefined;
+    const tipo = query.tipo === "colaborador" ? "colaborador" : "aluno";
 
     if (!termo && idMember === undefined) {
       reply.code(400);
@@ -30,7 +32,9 @@ export async function catracaRoutes(app: FastifyInstance): Promise<void> {
     }
 
     try {
-      return await buscarAlunoEvo(termo, idMember);
+      return tipo === "colaborador"
+        ? await buscarColaboradorEvo(termo, idMember)
+        : await buscarAlunoEvo(termo, idMember);
     } catch (error) {
       reply.code(502);
       return { erro: error instanceof Error ? error.message : "Falha ao consultar EVO." };
@@ -44,6 +48,7 @@ export async function catracaRoutes(app: FastifyInstance): Promise<void> {
       select: {
         idMember: true,
         nome: true,
+        tipo: true,
         ativo: true,
         enroladoEm: true,
         atualizadoEm: true,
@@ -53,13 +58,14 @@ export async function catracaRoutes(app: FastifyInstance): Promise<void> {
   });
 
   app.post<{ Body: EnrollBody }>("/catraca/alunos", async (request, reply) => {
-    const { idMember, nome, fotoBase64 } = request.body;
+    const { idMember, nome, fotoBase64, tipo } = request.body;
     if (typeof idMember !== "number" || !nome || !fotoBase64) {
       reply.code(400);
       return { erro: "idMember, nome e fotoBase64 são obrigatórios." };
     }
 
-    const resultado = await enrollAluno(idMember, nome, fotoBase64);
+    const tipoFinal = tipo === "colaborador" ? "colaborador" : "aluno";
+    const resultado = await enrollAluno(idMember, nome, fotoBase64, tipoFinal);
     if (!resultado.ok) {
       reply.code(202);
       return { ok: false, motivo: resultado.reason };

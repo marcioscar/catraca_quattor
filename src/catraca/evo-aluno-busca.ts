@@ -31,6 +31,7 @@ export interface AlunoEvoConsulta {
   idMember: number | null;
   nome: string | null;
   plano: string | null;
+  tipo: "aluno" | "colaborador";
 }
 
 export interface AlunoEvoCandidato {
@@ -181,6 +182,12 @@ async function getFuncionarioPorId(idEmployee: number): Promise<EmployeeResumo |
   return Array.isArray(payload) ? (payload.find((e) => e.idEmployee === idEmployee) ?? null) : null;
 }
 
+async function getFuncionariosByName(nome: string): Promise<EmployeeResumo[]> {
+  const search = new URLSearchParams({ name: nome.trim(), take: "25", skip: "0" });
+  const payload = await fetchEvoJson<EmployeeResumo[]>(`${DEFAULT_BASE_URL}${EMPLOYEES_PATH}?${search}`);
+  return Array.isArray(payload) ? payload : [];
+}
+
 function pickMembershipPrincipal(memberships: MemberMembership[]): MemberMembership | null {
   const ativos = filtrarContratosAtivos(memberships);
   if (!ativos.length) {
@@ -228,13 +235,14 @@ function extrairCandidatosUnicos(
 
 async function membershipParaConsulta(membership: MemberMembership | null): Promise<AlunoEvoConsulta> {
   if (!membership) {
-    return { encontrado: false, idMember: null, nome: null, plano: null };
+    return { encontrado: false, idMember: null, nome: null, plano: null, tipo: "aluno" };
   }
   return {
     encontrado: true,
     idMember: membership.idMember ?? null,
     nome: membership.name ?? null,
     plano: membership.nameMembership ?? null,
+    tipo: "aluno",
   };
 }
 
@@ -388,4 +396,63 @@ export async function buscarAlunoEvo(
     return { consulta: await consultarAlunoPorIdMember(candidatos[0].idMember), candidatos: null };
   }
   return { consulta: await membershipParaConsulta(null), candidatos: null };
+}
+
+function funcionarioParaConsulta(funcionario: EmployeeResumo | null): AlunoEvoConsulta {
+  if (!funcionario || typeof funcionario.idEmployee !== "number") {
+    return { encontrado: false, idMember: null, nome: null, plano: null, tipo: "colaborador" };
+  }
+  return {
+    encontrado: true,
+    idMember: funcionario.idEmployee,
+    nome: funcionario.name ?? null,
+    plano: funcionario.status ?? null,
+    tipo: "colaborador",
+  };
+}
+
+/**
+ * Mesma forma de `buscarAlunoEvo`, mas contra `/api/v2/employees` — espaço de
+ * id separado (`idEmployee`), reaproveitado como `idMember`/enrollid no
+ * `CatracaAluno` (ver comentário no schema.prisma).
+ */
+export async function buscarColaboradorEvo(
+  termo: string,
+  idEmployeeSelecionado?: number
+): Promise<BuscaAlunoEvoResultado> {
+  if (typeof idEmployeeSelecionado === "number") {
+    return { consulta: funcionarioParaConsulta(await getFuncionarioPorId(idEmployeeSelecionado)), candidatos: null };
+  }
+
+  const termoTrimmed = termo.trim();
+  if (!termoTrimmed) {
+    return { consulta: funcionarioParaConsulta(null), candidatos: null };
+  }
+
+  const funcionarios = isNumericId(termoTrimmed)
+    ? [await getFuncionarioPorId(Number(termoTrimmed))].filter((f): f is EmployeeResumo => f !== null)
+    : await getFuncionariosByName(termoTrimmed);
+
+  const candidatosUnicos = funcionarios.filter(
+    (f): f is EmployeeResumo & { idEmployee: number; name: string } =>
+      typeof f.idEmployee === "number" && typeof f.name === "string"
+  );
+
+  if (candidatosUnicos.length > 1) {
+    const candidatos: AlunoEvoCandidato[] = candidatosUnicos
+      .map((f) => ({
+        idMember: f.idEmployee,
+        nome: f.name,
+        planoAtual: f.status ?? null,
+        statusContrato: (f.status?.toLowerCase() === "ativo" ? "ativo" : "desconhecido") as
+          | "ativo"
+          | "desconhecido",
+      }))
+      .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR", { sensitivity: "base" }));
+    return { consulta: null, candidatos };
+  }
+  if (candidatosUnicos.length === 1) {
+    return { consulta: funcionarioParaConsulta(candidatosUnicos[0]), candidatos: null };
+  }
+  return { consulta: funcionarioParaConsulta(null), candidatos: null };
 }

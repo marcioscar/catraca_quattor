@@ -17,6 +17,11 @@ const btnRecapturar = document.getElementById("btn-recapturar");
 const btnCadastrar = document.getElementById("btn-cadastrar");
 const tabelaAlunosBody = document.querySelector("#tabela-alunos tbody");
 const tabelaAcessosBody = document.querySelector("#tabela-acessos tbody");
+const tipoToggleEl = document.getElementById("tipo-toggle");
+
+function tipoSelecionado() {
+  return tipoToggleEl.querySelector('input[name="tipo-cadastro"]:checked').value;
+}
 
 let alunoSelecionado = null;
 let fotoBase64 = null;
@@ -51,6 +56,7 @@ async function carregarAlunos() {
     tr.innerHTML = `
       <td>${aluno.nome ?? "-"}</td>
       <td>${aluno.idMember}</td>
+      <td><span class="badge tipo">${aluno.tipo === "colaborador" ? "Colaborador" : "Aluno"}</span></td>
       <td><span class="badge ${aluno.ativo ? "ativo" : "inativo"}">${aluno.ativo ? "Ativo" : "Inativo"}</span></td>
       <td>${formatDataHora(aluno.enroladoEm)}</td>
       <td><button class="secundario" data-remover="${aluno.idMember}">Remover</button></td>
@@ -166,9 +172,11 @@ async function buscarAluno(termo, idMember) {
   buscaMensagemEl.className = "";
   limparResultadoBusca();
 
+  const tipo = tipoSelecionado();
   const params = new URLSearchParams();
   if (termo) params.set("termo", termo);
   if (idMember !== undefined) params.set("idMember", String(idMember));
+  params.set("tipo", tipo);
 
   try {
     const resposta = await fetch(`/catraca/busca?${params}`);
@@ -181,7 +189,8 @@ async function buscarAluno(termo, idMember) {
     }
 
     if (dados.candidatos && dados.candidatos.length > 0) {
-      buscaMensagemEl.textContent = `Encontramos ${dados.candidatos.length} alunos com plano ativo. Selecione o correto:`;
+      const rotuloLista = tipo === "colaborador" ? "colaboradores" : "alunos com plano ativo";
+      buscaMensagemEl.textContent = `Encontramos ${dados.candidatos.length} ${rotuloLista}. Selecione o correto:`;
       for (const candidato of dados.candidatos) {
         const li = document.createElement("li");
         const button = document.createElement("button");
@@ -200,7 +209,8 @@ async function buscarAluno(termo, idMember) {
       return;
     }
 
-    buscaMensagemEl.textContent = "Nenhum aluno com plano ativo encontrado.";
+    buscaMensagemEl.textContent =
+      tipo === "colaborador" ? "Nenhum colaborador encontrado." : "Nenhum aluno com plano ativo encontrado.";
     buscaMensagemEl.className = "mensagem-erro";
   } catch {
     buscaMensagemEl.textContent = "Falha ao consultar a EVO.";
@@ -223,15 +233,17 @@ async function cadastrarAluno() {
         idMember: alunoSelecionado.idMember,
         nome: alunoSelecionado.nome,
         fotoBase64,
+        tipo: alunoSelecionado.tipo ?? "aluno",
       }),
     });
     const dados = await resposta.json();
 
+    const rotuloTipo = alunoSelecionado.tipo === "colaborador" ? "Colaborador" : "Aluno";
     if (dados.ok) {
-      buscaMensagemEl.textContent = "Aluno cadastrado na catraca!";
+      buscaMensagemEl.textContent = `${rotuloTipo} cadastrado na catraca!`;
       buscaMensagemEl.className = "mensagem-ok";
     } else if (dados.motivo === "device_offline") {
-      buscaMensagemEl.textContent = "Aluno salvo, mas a catraca está offline agora — tente reenviar depois.";
+      buscaMensagemEl.textContent = `${rotuloTipo} salvo, mas a catraca está offline agora — tente reenviar depois.`;
       buscaMensagemEl.className = "mensagem-erro";
     } else {
       buscaMensagemEl.textContent = "Não foi possível cadastrar na catraca.";
@@ -265,6 +277,12 @@ formBusca.addEventListener("submit", (event) => {
 btnCapturar.addEventListener("click", capturarFoto);
 btnRecapturar.addEventListener("click", recapturarFoto);
 btnCadastrar.addEventListener("click", cadastrarAluno);
+
+tipoToggleEl.addEventListener("change", () => {
+  termoInput.value = "";
+  buscaMensagemEl.textContent = "";
+  limparResultadoBusca();
+});
 
 tabelaAlunosBody.addEventListener("click", (event) => {
   const idMember = event.target?.dataset?.remover;

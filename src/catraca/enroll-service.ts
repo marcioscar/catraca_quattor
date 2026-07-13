@@ -10,12 +10,13 @@ export type EnrollResult =
 export async function enrollAluno(
   idMember: number,
   nome: string,
-  fotoBase64: string
+  fotoBase64: string,
+  tipo: "aluno" | "colaborador" = "aluno"
 ): Promise<EnrollResult> {
   await db.catracaAluno.upsert({
     where: { idMember },
-    create: { idMember, nome, fotoBase64, ativo: true },
-    update: { nome, fotoBase64, ativo: true, removidoEm: null },
+    create: { idMember, nome, fotoBase64, ativo: true, tipo },
+    update: { nome, fotoBase64, ativo: true, tipo, removidoEm: null },
   });
   marcarConhecido(idMember);
 
