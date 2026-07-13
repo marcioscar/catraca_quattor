@@ -13,18 +13,31 @@ html, body {
   background: #111827;
 }
 
-main {
+.tela {
+  display: none;
   height: 100vh;
-  display: flex;
   align-items: center;
   justify-content: center;
   transition: background-color 0.4s ease;
   position: relative;
 }
 
-main.aguardando { background: #111827; }
-main.liberado { background: #065f46; }
-main.negado { background: #7f1d1d; }
+.tela.ativa {
+  display: flex;
+}
+
+#tela-detalhe.aguardando { background: #111827; }
+#tela-detalhe.liberado { background: #065f46; }
+#tela-detalhe.negado { background: #7f1d1d; }
+
+#tela-grade {
+  background: linear-gradient(135deg, #2b1608 0%, #2a0f12 28%, #0d1224 55%, #071c28 78%, #0a2016 100%);
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  padding: 168px 64px 48px;
+  overflow: hidden;
+}
 
 .conteudo {
   display: flex;
@@ -94,13 +107,115 @@ h1#nome {
   margin: 0;
 }
 
-.link-voltar {
+.logo-marca {
+  position: fixed;
+  top: 32px;
+  left: 32px;
+  height: 100px;
+  z-index: 10;
+}
+
+.marca-dagua {
   position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 65%;
+  max-width: 820px;
+  opacity: 0.28;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.grade-titulo,
+.grade-lista {
+  position: relative;
+  z-index: 1;
+}
+
+.grade-titulo {
+  color: white;
+  opacity: 0.8;
+  font-size: 1.6rem;
+  font-weight: 600;
+  margin: 0 0 32px;
+  padding-left: 4px;
+}
+
+.grade-lista {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  align-content: space-evenly;
+  justify-items: center;
+  gap: 24px;
+  overflow-y: auto;
+}
+
+.grade-vazia {
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 1.2rem;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 10px;
+}
+
+.card-foto {
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.08);
+  font-size: 2rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.6);
+  border: 3px solid transparent;
+}
+
+.card.liberado .card-foto { border-color: #10b981; }
+.card.negado .card-foto { border-color: #ef4444; }
+
+.card-foto img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.card-nome {
+  color: white;
+  font-size: 0.95rem;
+  font-weight: 600;
+  margin: 0;
+  line-height: 1.2;
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.card-hora {
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 0.8rem;
+  margin: 0;
+}
+
+.link-voltar {
+  position: fixed;
   bottom: 20px;
   left: 24px;
   color: rgba(255, 255, 255, 0.4);
   text-decoration: none;
   font-size: 0.85rem;
+  z-index: 10;
 }
 
 .link-voltar:hover {

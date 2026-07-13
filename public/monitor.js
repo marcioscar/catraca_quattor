@@ -1,4 +1,7 @@
-const telaEl = document.getElementById("tela");
+const telaDetalheEl = document.getElementById("tela-detalhe");
+const telaGradeEl = document.getElementById("tela-grade");
+const gradeListaEl = document.getElementById("grade-lista");
+
 const fotoEl = document.getElementById("foto");
 const avatarEl = document.getElementById("avatar");
 const resultadoEl = document.getElementById("resultado");
@@ -16,7 +19,13 @@ const ROTULOS = {
 
 const MOTIVOS_WELLHUB = new Set(["wellhub_ok", "wellhub_provisorio"]);
 
+const TEMPO_DETALHE_MS = 30000;
+const QTD_GRADE = 42;
+const INTERVALO_POLL_MS = 2000;
+const INTERVALO_ATUALIZA_GRADE_MS = 5000;
+
 let ultimoIdMostrado = null;
+let timeoutVoltarGrade = null;
 
 function iniciais(nome) {
   const partes = nome.trim().split(/\s+/).filter(Boolean);
@@ -31,9 +40,25 @@ function formatHorario(iso) {
   return `${pad(d.getDate())}/${pad(d.getMonth() + 1)} às ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 }
 
+function mostrarTelaDetalhe() {
+  telaDetalheEl.classList.add("ativa");
+  telaGradeEl.classList.remove("ativa");
+}
+
+function mostrarTelaGrade() {
+  telaGradeEl.classList.add("ativa");
+  telaDetalheEl.classList.remove("ativa");
+  carregarGrade();
+}
+
+function agendarVoltaParaGrade() {
+  clearTimeout(timeoutVoltarGrade);
+  timeoutVoltarGrade = setTimeout(mostrarTelaGrade, TEMPO_DETALHE_MS);
+}
+
 function mostrarAcesso(acesso) {
-  telaEl.classList.remove("aguardando", "liberado", "negado");
-  telaEl.classList.add(acesso.permitido ? "liberado" : "negado");
+  telaDetalheEl.classList.remove("aguardando", "liberado", "negado");
+  telaDetalheEl.classList.add(acesso.permitido ? "liberado" : "negado");
 
   resultadoEl.textContent = ROTULOS[acesso.motivo] ?? (acesso.permitido ? "Liberado" : "Negado");
   nomeEl.textContent = acesso.nome || `Membro ${acesso.idMember}`;
@@ -58,6 +83,50 @@ function mostrarAcesso(acesso) {
   }
 }
 
+function criarCard(acesso) {
+  const card = document.createElement("div");
+  card.className = `card ${acesso.permitido ? "liberado" : "negado"}`;
+
+  const fotoWrap = document.createElement("div");
+  fotoWrap.className = "card-foto";
+  if (acesso.fotoBase64) {
+    const img = document.createElement("img");
+    img.src = acesso.fotoBase64;
+    img.alt = "";
+    fotoWrap.appendChild(img);
+  } else {
+    fotoWrap.textContent = iniciais(acesso.nome || "?");
+  }
+
+  const nome = document.createElement("p");
+  nome.className = "card-nome";
+  nome.textContent = acesso.nome || `Membro ${acesso.idMember}`;
+
+  const hora = document.createElement("p");
+  hora.className = "card-hora";
+  hora.textContent = formatHorario(acesso.ocorridoEm);
+
+  card.append(fotoWrap, nome, hora);
+  return card;
+}
+
+async function carregarGrade() {
+  try {
+    const resposta = await fetch(`/catraca/acessos?take=${QTD_GRADE}`);
+    const acessos = await resposta.json();
+    if (!Array.isArray(acessos) || acessos.length === 0) {
+      gradeListaEl.replaceChildren(Object.assign(document.createElement("p"), {
+        className: "grade-vazia",
+        textContent: "Nenhum acesso registrado ainda.",
+      }));
+      return;
+    }
+    gradeListaEl.replaceChildren(...acessos.map(criarCard));
+  } catch {
+    // Silencioso — só tenta de novo no próximo ciclo.
+  }
+}
+
 async function verificarNovoAcesso() {
   try {
     const resposta = await fetch("/catraca/acessos/ultimo");
@@ -67,10 +136,18 @@ async function verificarNovoAcesso() {
     }
     ultimoIdMostrado = acesso.id;
     mostrarAcesso(acesso);
+    mostrarTelaDetalhe();
+    agendarVoltaParaGrade();
   } catch {
     // Silencioso — só tenta de novo no próximo ciclo.
   }
 }
 
+mostrarTelaGrade();
 verificarNovoAcesso();
-setInterval(verificarNovoAcesso, 2000);
+setInterval(verificarNovoAcesso, INTERVALO_POLL_MS);
+setInterval(() => {
+  if (telaGradeEl.classList.contains("ativa")) {
+    carregarGrade();
+  }
+}, INTERVALO_ATUALIZA_GRADE_MS);

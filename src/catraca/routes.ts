@@ -153,14 +153,15 @@ export async function catracaRoutes(app: FastifyInstance): Promise<void> {
     const idMembers = [...new Set(acessos.map((acesso) => acesso.idMember))];
     const alunos = await db.catracaAluno.findMany({
       where: { idMember: { in: idMembers } },
-      select: { idMember: true, nome: true },
+      select: { idMember: true, nome: true, fotoBase64: true },
     });
-    const nomePorIdMember = new Map(alunos.map((aluno) => [aluno.idMember, aluno.nome]));
+    const alunoPorIdMember = new Map(alunos.map((aluno) => [aluno.idMember, aluno]));
 
     // Prefere o nome já enriquecido via EVO; o do sendlog (device) costuma vir vazio.
     return acessos.map((acesso) => ({
       ...acesso,
-      nome: nomePorIdMember.get(acesso.idMember) ?? acesso.nome,
+      nome: alunoPorIdMember.get(acesso.idMember)?.nome ?? acesso.nome,
+      fotoBase64: alunoPorIdMember.get(acesso.idMember)?.fotoBase64 ?? null,
     }));
   });
 

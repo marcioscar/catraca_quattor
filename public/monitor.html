@@ -7,7 +7,9 @@
   <link rel="stylesheet" href="/monitor.css" />
 </head>
 <body>
-  <main id="tela" class="aguardando">
+  <img src="/logo_branco.png" class="logo-marca" alt="Quattor Academia" />
+
+  <main id="tela-detalhe" class="tela ativa aguardando">
     <div class="conteudo">
       <div class="lado-foto">
         <img id="foto" hidden alt="Foto do aluno" />
@@ -20,8 +22,15 @@
         <p id="horario" class="horario"></p>
       </div>
     </div>
-    <a href="/" class="link-voltar">← Cadastro</a>
   </main>
+
+  <main id="tela-grade" class="tela">
+    <img src="/bolas.png" class="marca-dagua" alt="" aria-hidden="true" />
+    <h2 class="grade-titulo">Últimos acessos</h2>
+    <div id="grade-lista" class="grade-lista"></div>
+  </main>
+
+  <a href="/" class="link-voltar">← Cadastro</a>
 
   <script src="/monitor.js"></script>
 </body>
