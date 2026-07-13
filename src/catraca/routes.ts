@@ -6,6 +6,7 @@ import { buscarAlunoEvo, buscarColaboradorEvo } from "./evo-aluno-busca.js";
 import { enriquecerNomesEvo, getProgressoEnriquecimento } from "./enriquecer-nomes-evo.js";
 import { sincronizarClientesEvo, getProgressoSincronizacaoClientes } from "./evo-clientes-sync.js";
 import { NAO_REMOVIDO } from "./filtros.js";
+import { PERSON_TYPE_CLIENTE } from "./evo-access-control.js";
 
 interface EnrollBody {
   idMember?: number;
@@ -204,7 +205,7 @@ export async function catracaRoutes(app: FastifyInstance): Promise<void> {
     inicioDoDia.setHours(0, 0, 0, 0);
 
     const total = await db.catracaAcessoLog.count({
-      where: { ocorridoEm: { gte: inicioDoDia }, permitido: true },
+      where: { ocorridoEm: { gte: inicioDoDia }, permitido: true, personType: PERSON_TYPE_CLIENTE },
     });
     return { total };
   });
