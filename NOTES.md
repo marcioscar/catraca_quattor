@@ -64,10 +64,37 @@ confirmado observando tráfego real:
   (`{"ret":"senduser","result":true}`) ou ele reenvia o mesmo usuário pra
   sempre. Foi assim que conseguimos fotos reais de ~4378 alunos sem precisar
   recapturar nada manualmente.
-- `setuserinfo` (nós → device, cadastro manual): formato ainda **não
-  confirmado** contra hardware real — só testado via cadastro manual pela
-  tela local, sem verificação de que o device realmente aceitou/gravou o
-  jeito que esperávamos. Validar no próximo cadastro real.
+- `setuserinfo` (nós → device, cadastro manual pela tela local `/`):
+  **testado contra hardware real em 2026-07-14, três tentativas, nenhuma
+  funcionou de verdade** — cadastro de um colaborador novo (enrollid 577):
+  1. Envio direto do `record` (foto capturada por `canvas.toDataURL()`, já
+     sem o prefixo `data:image/...;base64,` — bug real que existia e foi
+     corrigido, ver `protocol.ts`/`paraBase64Puro`). Device respondeu
+     `{"ret":"setuserinfo","result":true}`. Ele passou o rosto no leitor:
+     **não reconheceu, sem reação nenhuma**.
+  2. Reenvio adicionando `backupnum: 10` (convenção comum em devices
+     ZKTeco/AiFace pra indicar "isso é um template de rosto", tentativa
+     baseada em padrão de mercado, não documentação oficial da TopData).
+     Device ecoou `backupnum:10` de volta em `result:true`. Testou nele:
+     **de novo nada**.
+  3. Foto nova, enquadramento mais afastado (menos "selfie de perto", mais
+     parecido com a distância que a câmera do leitor captura de verdade).
+     `result:true` de novo. **De novo nada.**
+  - **Conclusão**: `result:true` parece só confirmar que o JSON foi aceito
+    (enrollid/nome válidos), não que um template de rosto pesquisável foi
+    de fato gerado a partir da foto enviada. Provavelmente esse comando (do
+    jeito que estamos chamando) não é suficiente pra cadastro biométrico
+    remoto nesse hardware — falta a especificação oficial da TopData pra
+    saber se falta algum campo, ou se simplesmente não é suportado via API
+    (só captura ao vivo pela própria câmera do leitor gera template válido).
+  - **O que funciona, confirmado**: cadastro manual direto no painel touch
+    do leitor (`MENU → engrenagem`) — resolveu o caso do Arthur na hora.
+    **Usar esse caminho pra colaboradores/alunos novos até o `setuserinfo`
+    ser resolvido** (ou até a TopData confirmar a spec exata).
+  - Rota de diagnóstico `GET /catraca/debug/log` (par de `POST /catraca/
+    debug/send`) foi criada pra esse bring-up — mostra as últimas 100
+    mensagens WS trocadas com o device, em memória. Remover as duas depois
+    que isso for resolvido de vez.
 
 ## Decisões de arquitetura
 
@@ -363,6 +390,10 @@ nssm remove CatracaApi confirm
    virar uma entrada de verdade — decisão do usuário, ver conversa de
    2026-07-10).
 4. Ligar `Servidor Valida: Sim` no menu do leitor facial.
-5. Validar `setuserinfo` (cadastro manual) contra o device real de verdade.
+5. ~~Validar `setuserinfo` contra o device real~~ — **validado em
+   2026-07-14, não funciona** (ver seção "Protocolo" acima). Cadastro de
+   rosto por enquanto só pelo painel touch do leitor. Se algum dia quiser
+   retomar o cadastro remoto: precisa da spec oficial da TopData pro
+   `setuserinfo`, não dá mais pra resolver só adivinhando campos.
 6. Só depois de tudo validado e estável: conversar sobre desativar o
    sistema antigo da EVO em `192.168.1.12`.
