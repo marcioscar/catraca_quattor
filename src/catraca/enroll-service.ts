@@ -53,13 +53,25 @@ export async function importarAlunoDoDispositivo(idMember: number, nomeDoDevice:
  * Foto empurrada espontaneamente pelo dispositivo (`senduser`) — vem como
  * base64 JPEG puro, sem prefixo `data:`, então adicionamos aqui para o
  * `<img src>` da tela funcionar direto.
+ *
+ * Só consulta a EVO (pra descobrir o `tipo`) quando o registro ainda não
+ * existe — `senduser` pode reenviar a mesma foto de gente já conhecida
+ * repetidas vezes (ver NOTES.md), e um lookup por evento aqui estouraria o
+ * rate limit da EVO fácil. `importarAlunoDoDispositivo` já não tem esse
+ * risco porque só pergunta uma vez por enrollid (`marcarPerguntadoSePrimeiraVez`).
  */
 export async function importarFotoDoDispositivo(idMember: number, fotoBase64Pura: string): Promise<void> {
-  await db.catracaAluno.upsert({
-    where: { idMember },
-    create: { idMember, fotoBase64: `data:image/jpeg;base64,${fotoBase64Pura}`, ativo: true },
-    update: { fotoBase64: `data:image/jpeg;base64,${fotoBase64Pura}` },
-  });
+  const fotoBase64 = `data:image/jpeg;base64,${fotoBase64Pura}`;
+  const existente = await db.catracaAluno.findUnique({ where: { idMember }, select: { id: true } });
+
+  if (existente) {
+    await db.catracaAluno.update({ where: { idMember }, data: { fotoBase64 } });
+  } else {
+    const evo = await buscarNomeEStatusPorIdMember(idMember).catch(() => null);
+    await db.catracaAluno.create({
+      data: { idMember, fotoBase64, nome: evo?.nome ?? null, tipo: evo?.tipo ?? "aluno", ativo: true },
+    });
+  }
   marcarConhecido(idMember);
 }
 
