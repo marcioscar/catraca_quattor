@@ -15,6 +15,7 @@ import { setActiveConnection, send, touchLastSeen } from "./connection-manager.j
 import { handleSendLog } from "./access-handler.js";
 import { importarAlunoDoDispositivo, importarFotoDoDispositivo } from "./enroll-service.js";
 import { jaConhecido, marcarPerguntadoSePrimeiraVez } from "./known-aluno-cache.js";
+import { registrarMensagem } from "./debug-log.js";
 import type { SendLogRecord } from "./protocol.js";
 
 /** Backlog anterior a isso é ignorado para fins de importação — aluno que só
@@ -42,6 +43,7 @@ function descobrirAlunosDesconhecidos(records: SendLogRecord[]): void {
 
 function handleMessage(socket: WebSocket, raw: string): void {
   console.log(`[catraca] mensagem recebida: ${raw}`);
+  registrarMensagem("in", raw);
 
   const message = parseDeviceMessage(raw);
   if (!message) {

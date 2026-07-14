@@ -7,6 +7,7 @@ import { enriquecerNomesEvo, getProgressoEnriquecimento } from "./enriquecer-nom
 import { sincronizarClientesEvo, getProgressoSincronizacaoClientes } from "./evo-clientes-sync.js";
 import { NAO_REMOVIDO } from "./filtros.js";
 import { PERSON_TYPE_CLIENTE } from "./evo-access-control.js";
+import { getUltimasMensagens } from "./debug-log.js";
 
 interface EnrollBody {
   idMember?: number;
@@ -127,6 +128,11 @@ export async function catracaRoutes(app: FastifyInstance): Promise<void> {
     }
     return { ok: true };
   });
+
+  // Companheira da rota acima — mostra as últimas mensagens WS trocadas com
+  // o device (os dois sentidos), pra depurar sem precisar puxar logs no PC
+  // da catraca. Remover junto com /catraca/debug/send.
+  app.get("/catraca/debug/log", async () => getUltimasMensagens());
 
   app.post("/catraca/enriquecer-nomes", async () => {
     enriquecerNomesEvo().catch((error) => console.error("[catraca] erro no enriquecimento:", error));

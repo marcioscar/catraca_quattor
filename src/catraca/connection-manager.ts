@@ -1,4 +1,5 @@
 import type { WebSocket } from "ws";
+import { registrarMensagem } from "./debug-log.js";
 
 /**
  * Guarda a única conexão viva da catraca (escopo: um único dispositivo).
@@ -38,6 +39,7 @@ export function send(message: string): boolean {
   if (!isConnected() || !activeSocket) {
     return false;
   }
+  registrarMensagem("out", message);
   activeSocket.send(message);
   return true;
 }
