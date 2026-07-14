@@ -116,27 +116,6 @@ button.secundario {
   font-size: 0.85rem;
 }
 
-#webcam-area {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  margin: 12px 0;
-}
-
-video, #foto-preview {
-  width: 240px;
-  height: 320px;
-  object-fit: cover;
-  border-radius: 12px;
-  background: #e4e4e7;
-}
-
-.botoes {
-  display: flex;
-  gap: 8px;
-}
-
 table {
   width: 100%;
   border-collapse: collapse;

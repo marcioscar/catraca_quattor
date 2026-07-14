@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { db } from "../db.js";
-import { enrollAluno, removeAluno } from "./enroll-service.js";
+import { classificarPessoa, removeAluno } from "./enroll-service.js";
 import { isConnected, getLastSeenAt, send } from "./connection-manager.js";
 import { buscarAlunoEvo, buscarColaboradorEvo } from "./evo-aluno-busca.js";
 import { enriquecerNomesEvo, getProgressoEnriquecimento } from "./enriquecer-nomes-evo.js";
@@ -12,7 +12,6 @@ import { getUltimasMensagens } from "./debug-log.js";
 interface EnrollBody {
   idMember?: number;
   nome?: string;
-  fotoBase64?: string;
   tipo?: string;
 }
 
@@ -60,18 +59,14 @@ export async function catracaRoutes(app: FastifyInstance): Promise<void> {
   });
 
   app.post<{ Body: EnrollBody }>("/catraca/alunos", async (request, reply) => {
-    const { idMember, nome, fotoBase64, tipo } = request.body;
-    if (typeof idMember !== "number" || !nome || !fotoBase64) {
+    const { idMember, nome, tipo } = request.body;
+    if (typeof idMember !== "number" || !nome) {
       reply.code(400);
-      return { erro: "idMember, nome e fotoBase64 são obrigatórios." };
+      return { erro: "idMember e nome são obrigatórios." };
     }
 
     const tipoFinal = tipo === "colaborador" ? "colaborador" : "aluno";
-    const resultado = await enrollAluno(idMember, nome, fotoBase64, tipoFinal);
-    if (!resultado.ok) {
-      reply.code(202);
-      return { ok: false, motivo: resultado.reason };
-    }
+    await classificarPessoa(idMember, nome, tipoFinal);
     return { ok: true };
   });
 

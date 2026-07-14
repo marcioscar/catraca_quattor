@@ -16,6 +16,12 @@
 
     <section class="card">
       <h2>Cadastrar aluno ou colaborador</h2>
+      <p class="detalhe">
+        O rosto é cadastrado direto no painel touch do leitor (o cadastro remoto
+        por aqui não funciona — ver NOTES.md). Essa tela só garante que o nosso
+        sistema classifica a pessoa certo (aluno ou colaborador) assim que ela
+        for descoberta pela catraca.
+      </p>
       <div id="tipo-toggle" class="tipo-toggle">
         <label><input type="radio" name="tipo-cadastro" value="aluno" checked /> Aluno</label>
         <label><input type="radio" name="tipo-cadastro" value="colaborador" /> Colaborador</label>
@@ -30,18 +36,7 @@
       <div id="aluno-encontrado" hidden>
         <p><strong id="aluno-nome"></strong></p>
         <p id="aluno-detalhe" class="detalhe"></p>
-
-        <div id="webcam-area">
-          <video id="video" autoplay playsinline muted></video>
-          <canvas id="canvas" hidden></canvas>
-          <img id="foto-preview" hidden alt="Foto capturada" />
-          <div class="botoes">
-            <button id="btn-capturar" type="button">Capturar foto</button>
-            <button id="btn-recapturar" type="button" hidden>Tirar outra</button>
-          </div>
-        </div>
-
-        <button id="btn-cadastrar" type="button" disabled>Cadastrar na catraca</button>
+        <button id="btn-cadastrar" type="button">Salvar classificação</button>
       </div>
     </section>
 

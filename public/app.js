@@ -1,6 +1,3 @@
-const LARGURA_FOTO = 480;
-const ALTURA_FOTO = 640;
-
 const statusEl = document.getElementById("status");
 const formBusca = document.getElementById("form-busca");
 const termoInput = document.getElementById("termo");
@@ -9,11 +6,6 @@ const candidatosEl = document.getElementById("candidatos");
 const alunoEncontradoEl = document.getElementById("aluno-encontrado");
 const alunoNomeEl = document.getElementById("aluno-nome");
 const alunoDetalheEl = document.getElementById("aluno-detalhe");
-const videoEl = document.getElementById("video");
-const canvasEl = document.getElementById("canvas");
-const fotoPreviewEl = document.getElementById("foto-preview");
-const btnCapturar = document.getElementById("btn-capturar");
-const btnRecapturar = document.getElementById("btn-recapturar");
 const btnCadastrar = document.getElementById("btn-cadastrar");
 const tabelaAlunosBody = document.querySelector("#tabela-alunos tbody");
 const tabelaAcessosBody = document.querySelector("#tabela-acessos tbody");
@@ -24,8 +16,6 @@ function tipoSelecionado() {
 }
 
 let alunoSelecionado = null;
-let fotoBase64 = null;
-let mediaStream = null;
 
 function formatDataHora(iso) {
   const d = new Date(iso);
@@ -39,7 +29,7 @@ async function atualizarStatus() {
     const dados = await resposta.json();
     statusEl.textContent = dados.conectado
       ? "Catraca conectada"
-      : "Catraca desconectada — cadastros ficam pendentes até ela reconectar";
+      : "Catraca desconectada";
     statusEl.className = dados.conectado ? "ok" : "off";
   } catch {
     statusEl.textContent = "Não foi possível checar o status da catraca.";
@@ -88,83 +78,17 @@ async function carregarAcessos() {
   }
 }
 
-function pararWebcam() {
-  mediaStream?.getTracks().forEach((track) => track.stop());
-  mediaStream = null;
-}
-
-async function iniciarWebcam() {
-  try {
-    mediaStream = await navigator.mediaDevices.getUserMedia({
-      video: { width: LARGURA_FOTO, height: ALTURA_FOTO },
-      audio: false,
-    });
-    videoEl.srcObject = mediaStream;
-    videoEl.hidden = false;
-    btnCapturar.disabled = false;
-  } catch {
-    buscaMensagemEl.textContent = "Não foi possível acessar a câmera. Verifique a permissão do navegador.";
-    buscaMensagemEl.className = "mensagem-erro";
-  }
-}
-
-function capturarFoto() {
-  const context = canvasEl.getContext("2d");
-  const proporcaoAlvo = LARGURA_FOTO / ALTURA_FOTO;
-  const proporcaoVideo = videoEl.videoWidth / videoEl.videoHeight;
-
-  let recorteLargura = videoEl.videoWidth;
-  let recorteAltura = videoEl.videoHeight;
-  if (proporcaoVideo > proporcaoAlvo) {
-    recorteLargura = videoEl.videoHeight * proporcaoAlvo;
-  } else {
-    recorteAltura = videoEl.videoWidth / proporcaoAlvo;
-  }
-  const offsetX = (videoEl.videoWidth - recorteLargura) / 2;
-  const offsetY = (videoEl.videoHeight - recorteAltura) / 2;
-
-  canvasEl.width = LARGURA_FOTO;
-  canvasEl.height = ALTURA_FOTO;
-  context.drawImage(videoEl, offsetX, offsetY, recorteLargura, recorteAltura, 0, 0, LARGURA_FOTO, ALTURA_FOTO);
-
-  fotoBase64 = canvasEl.toDataURL("image/jpeg", 0.9);
-  fotoPreviewEl.src = fotoBase64;
-  fotoPreviewEl.hidden = false;
-  videoEl.hidden = true;
-  btnCapturar.hidden = true;
-  btnRecapturar.hidden = false;
-  btnCadastrar.disabled = false;
-  pararWebcam();
-}
-
-function recapturarFoto() {
-  fotoBase64 = null;
-  fotoPreviewEl.hidden = true;
-  btnRecapturar.hidden = true;
-  btnCapturar.hidden = false;
-  btnCadastrar.disabled = true;
-  iniciarWebcam();
-}
-
 function mostrarAlunoEncontrado(consulta) {
   alunoSelecionado = consulta;
   alunoNomeEl.textContent = consulta.nome ?? `Membro ${consulta.idMember}`;
   alunoDetalheEl.textContent = `ID ${consulta.idMember} · ${consulta.plano ?? "sem plano"}`;
   alunoEncontradoEl.hidden = false;
-  fotoBase64 = null;
-  fotoPreviewEl.hidden = true;
-  btnRecapturar.hidden = true;
-  btnCapturar.hidden = false;
-  btnCapturar.disabled = true;
-  btnCadastrar.disabled = true;
-  iniciarWebcam();
 }
 
 function limparResultadoBusca() {
   candidatosEl.innerHTML = "";
   alunoEncontradoEl.hidden = true;
   alunoSelecionado = null;
-  pararWebcam();
 }
 
 async function buscarAluno(termo, idMember) {
@@ -219,11 +143,11 @@ async function buscarAluno(termo, idMember) {
 }
 
 async function cadastrarAluno() {
-  if (!alunoSelecionado?.idMember || !alunoSelecionado?.nome || !fotoBase64) {
+  if (!alunoSelecionado?.idMember || !alunoSelecionado?.nome) {
     return;
   }
   btnCadastrar.disabled = true;
-  btnCadastrar.textContent = "Cadastrando...";
+  btnCadastrar.textContent = "Salvando...";
 
   try {
     const resposta = await fetch("/catraca/alunos", {
@@ -232,7 +156,6 @@ async function cadastrarAluno() {
       body: JSON.stringify({
         idMember: alunoSelecionado.idMember,
         nome: alunoSelecionado.nome,
-        fotoBase64,
         tipo: alunoSelecionado.tipo ?? "aluno",
       }),
     });
@@ -240,13 +163,10 @@ async function cadastrarAluno() {
 
     const rotuloTipo = alunoSelecionado.tipo === "colaborador" ? "Colaborador" : "Aluno";
     if (dados.ok) {
-      buscaMensagemEl.textContent = `${rotuloTipo} cadastrado na catraca!`;
+      buscaMensagemEl.textContent = `${rotuloTipo} classificado — falta cadastrar o rosto no painel do leitor, se ainda não foi.`;
       buscaMensagemEl.className = "mensagem-ok";
-    } else if (dados.motivo === "device_offline") {
-      buscaMensagemEl.textContent = `${rotuloTipo} salvo, mas a catraca está offline agora — tente reenviar depois.`;
-      buscaMensagemEl.className = "mensagem-erro";
     } else {
-      buscaMensagemEl.textContent = "Não foi possível cadastrar na catraca.";
+      buscaMensagemEl.textContent = "Não foi possível salvar.";
       buscaMensagemEl.className = "mensagem-erro";
     }
 
@@ -257,7 +177,8 @@ async function cadastrarAluno() {
     buscaMensagemEl.textContent = "Falha ao falar com a API da catraca.";
     buscaMensagemEl.className = "mensagem-erro";
   } finally {
-    btnCadastrar.textContent = "Cadastrar na catraca";
+    btnCadastrar.textContent = "Salvar classificação";
+    btnCadastrar.disabled = false;
   }
 }
 
@@ -274,8 +195,6 @@ formBusca.addEventListener("submit", (event) => {
   }
 });
 
-btnCapturar.addEventListener("click", capturarFoto);
-btnRecapturar.addEventListener("click", recapturarFoto);
 btnCadastrar.addEventListener("click", cadastrarAluno);
 
 tipoToggleEl.addEventListener("change", () => {
