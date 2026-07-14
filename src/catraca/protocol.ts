@@ -119,14 +119,25 @@ export function buildAccessReply(enrollid: number, access: boolean): string {
   return JSON.stringify({ ret: "sendlog", enrollid, access });
 }
 
+/**
+ * Remove o prefixo `data:image/...;base64,` (presente quando a foto vem de
+ * `canvas.toDataURL()` na tela local de cadastro) — o device manda fotos
+ * nesse mesmo formato só que em base64 puro (confirmado via `senduser`, ver
+ * `SendUserMessage`), então é o que ele deve esperar receber também.
+ */
+function paraBase64Puro(fotoBase64: string): string {
+  const virgula = fotoBase64.indexOf(",");
+  return fotoBase64.startsWith("data:") && virgula !== -1 ? fotoBase64.slice(virgula + 1) : fotoBase64;
+}
+
 export function buildSetUserInfo(enrollid: number, nome: string, fotoBase64: string): string {
-  // Campos exatos (nome do campo de foto, encoding, limites) não confirmados
-  // contra o dispositivo real — ajustar aqui no bring-up on-site.
+  // Campos exatos (nome do campo, limites) ainda não confirmados contra o
+  // dispositivo real — só o encoding (base64 puro) é conhecido com certeza.
   return JSON.stringify({
     cmd: "setuserinfo",
     enrollid,
     name: nome,
-    record: fotoBase64,
+    record: paraBase64Puro(fotoBase64),
   });
 }
 
