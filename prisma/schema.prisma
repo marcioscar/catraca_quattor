@@ -86,6 +86,29 @@ model EvoCliente {
     @@index([document])
 }
 
+// Catálogo de planos da EVO (GET /api/v2/membership) — pensando na migração
+// futura pra fora da EVO, guarda os planos localmente. NÃO inclui "Horários
+// de contrato" (restrição de dia/hora por plano, ver painel admin da EVO) —
+// esse dado não é exposto por esse endpoint nem achamos outro que exponha
+// (só o motor interno `entryAuthorize` da EVO parece ter acesso, ver
+// NOTES.md, blockedType 9).
+model EvoPlano {
+    id             String   @id @default(auto()) @map("_id") @db.ObjectId
+    idMembership   Int      @unique
+    idBranch       Int?
+    nameMembership String?
+    membershipType String?
+    durationType   String?
+    duration       Int?
+    value          Float?
+    description    String?
+    inactive       Boolean?
+    displayName    String?
+    raw            Json? // payload bruto da EVO (entries, differentials, accessBranches, etc.)
+    sincronizadoEm DateTime @default(now())
+    atualizadoEm   DateTime @updatedAt
+}
+
 model CatracaAcessoLog {
     id         String   @id @default(auto()) @map("_id") @db.ObjectId
     idMember   Int // == enrollid recebido no sendlog
