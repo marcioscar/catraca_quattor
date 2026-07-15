@@ -3,15 +3,20 @@ import { classificarAlunoPorPlanosAtivos } from "./evo-plano-classificacao.js";
 import type { TurmaHorario } from "./horario-restricao.js";
 
 /**
- * Cacheia o horário de turma (`/api/v1/activities/enrollment/member-
- * enrollment`) só de quem foi classificado como "turma" (nenhum plano ativo
- * livre nem Hora Certa) — roda depois de `evo-membership-sync.ts`. Chamada
- * por aluno (esse endpoint exige `idMember`, não tem versão em lote), mas o
- * volume é pequeno: a maioria dos alunos não tem matrícula em turma (testado
- * em 2026-07-15: só 1 em 25 alunos ativos aleatórios tinha).
+ * Cacheia o horário de turma (`/api/v2/activities/enroll/member`) só de
+ * quem foi classificado como "turma" (nenhum plano ativo livre nem Hora
+ * Certa) — roda depois de `evo-membership-sync.ts`. Chamada por aluno (esse
+ * endpoint exige `idMember`, não tem versão em lote), mas o volume é
+ * pequeno: a maioria dos alunos não tem matrícula em turma (testado em
+ * 2026-07-15: só 1 em 25 alunos ativos aleatórios tinha).
+ *
+ * Era `/api/v1/activities/enrollment/member-enrollment` até 2026-07-15 — a
+ * EVO trocou pra v2 (mesmos campos que já usamos, só ganhou
+ * `idConfigurationEnroll` a mais, que ignoramos). Migrado por segurança
+ * depois de confirmar ao vivo (ver NOTES.md).
  */
 const DEFAULT_BASE_URL = "https://evo-integracao-api.w12app.com.br";
-const MEMBER_ENROLLMENT_PATH = "/api/v1/activities/enrollment/member-enrollment";
+const MEMBER_ENROLLMENT_PATH = "/api/v2/activities/enroll/member";
 const DEFAULT_TIMEOUT_MS = 15000;
 const INTERVALO_MS = 700;
 const MAX_TENTATIVAS = 3;

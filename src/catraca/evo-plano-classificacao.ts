@@ -4,9 +4,9 @@ export type ClassificacaoPlano = "livre" | "horaCerta" | "turma";
 
 /**
  * Nomes de atividade que usam matrícula em turma com horário fixo
- * (`/api/v1/activities/enrollment/member-enrollment`) — confirmado com o
- * dono da academia em 2026-07-15, contra o catálogo real de 244 planos
- * ativos. Qualquer plano cujo nome contenha um desses termos é "turma".
+ * (`/api/v2/activities/enroll/member`) — confirmado com o dono da academia
+ * em 2026-07-15, contra o catálogo real de 244 planos ativos. Qualquer
+ * plano cujo nome contenha um desses termos é "turma".
  */
 const TERMOS_TURMA = [
   "ballet",

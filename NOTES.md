@@ -303,6 +303,21 @@ horário específicas — dois mecanismos diferentes na EVO:
 
 ## Bugs/gotchas encontrados
 
+- **A EVO troca a versão dos endpoints sem aviso** — descoberto em
+  2026-07-15 fazendo `refresh_project_oas` (a doc em cache era de março).
+  Pelo menos três endpoints que usamos mudaram de versão (formato de
+  resposta igual, só a URL): `/api/v2/membership` → `/api/v3/membership`
+  (`evo-planos-sync.ts`), `/api/v1/activities/enrollment/member-enrollment`
+  → `/api/v2/activities/enroll/member` (`evo-turma-sync.ts`). Migrado nos
+  dois depois de testar ao vivo. As versões antigas **ainda funcionavam**
+  no momento da troca (não é urgente, mas pode parar de funcionar sem
+  aviso). `/api/v1/members/active-members` também mudou (virou
+  `/api/v2/members/active-members`, resposta agora com campos diferentes:
+  `memberName`/`contractDescription`/etc.) — não usamos esse endpoint em
+  lugar nenhum (`evo-active-members.ts` usa `/api/v2/members?status=1`,
+  que não mudou), mas fica registrado caso alguém pense em usar. Vale
+  rodar `refresh_project_oas` de vez em quando pra pegar mudanças assim
+  antes que virem erro em produção.
 - **Prisma + MongoDB**: campo `DateTime?` (ex.: `removidoEm`) que nunca foi
   setado fica **ausente** no documento, não `null`. Um filtro
   `{ removidoEm: null }` **não bate** com "ausente" — só com null explícito.

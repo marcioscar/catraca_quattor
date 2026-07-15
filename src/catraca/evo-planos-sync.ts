@@ -1,13 +1,18 @@
 import { db } from "../db.js";
 
 /**
- * Importa o catálogo de planos da EVO (`GET /api/v2/membership`, paginado)
+ * Importa o catálogo de planos da EVO (`GET /api/v3/membership`, paginado)
  * pra uma coleção própria (`EvoPlano`) — pensando na migração futura pra
  * fora da EVO. Mesmo padrão de `evo-clientes-sync.ts` (paginação com
  * retentativa, rate limit espaçado — ver NOTES.md).
+ *
+ * Era `/api/v2/membership` até 2026-07-15 — a EVO trocou pra v3 (mesmo
+ * formato de resposta, só endpoints novos opcionais a mais). Atualizado
+ * depois de confirmar ao vivo que o v2 continua funcionando por enquanto,
+ * mas migrado por segurança (ver NOTES.md).
  */
 const DEFAULT_BASE_URL = "https://evo-integracao-api.w12app.com.br";
-const MEMBERSHIP_PATH = "/api/v2/membership";
+const MEMBERSHIP_PATH = "/api/v3/membership";
 const DEFAULT_TIMEOUT_MS = 15000;
 const TAKE = 50; // máximo aceito pela EVO
 const INTERVALO_MS = 400;

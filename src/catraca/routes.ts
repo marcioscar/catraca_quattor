@@ -153,7 +153,7 @@ export async function catracaRoutes(app: FastifyInstance): Promise<void> {
 
   app.get("/catraca/sincronizar-clientes", async () => getProgressoSincronizacaoClientes());
 
-  // Importa o catálogo de planos de GET /api/v2/membership (EVO) pra coleção
+  // Importa o catálogo de planos de GET /api/v3/membership (EVO) pra coleção
   // EvoPlano — ver evo-planos-sync.ts. Pensando na migração futura pra fora
   // da EVO; NÃO inclui "Horários de contrato" (a API não expõe esse dado).
   app.post("/catraca/sincronizar-planos", async (request) => {
