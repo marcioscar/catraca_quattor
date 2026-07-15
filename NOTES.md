@@ -252,6 +252,55 @@ confirmado observando tráfego real:
   ativos, 1570 com `wellhubId`, 69 logs, 22158 `EvoCliente` — todos iguais
   nos dois bancos antes da troca.
 
+## Restrição de horário (Hora Certa / turma)
+
+Implementado em 2026-07-15. Alguns planos só liberam entrada em janelas de
+horário específicas — dois mecanismos diferentes na EVO:
+
+- **"Hora Certa"** (qualquer plano com esse termo no nome): usa uma tabela
+  fixa de "Horários de contrato" (configurada no painel admin da EVO, aba
+  do plano) — **a API não expõe esse dado**, nem achamos outro endpoint que
+  exponha (procuramos; só o motor interno `entryAuthorize`, bloqueado por
+  permissão, parece ter acesso — ver seção Wellhub acima). A tabela foi
+  passada manualmente pelo dono da academia e está hardcoded em
+  `horario-restricao.ts` (`HORA_CERTA_JANELAS`). Tolerância: 15 min antes do
+  início e 15 min depois do fim de cada janela. **Não cobre a linha
+  "Feriado"** da tabela (sem calendário de feriados implementado — feriado
+  hoje é tratado como dia normal da semana).
+- **Turma marcada** (Ballet, Pilates, Judô, Natação, etc. — lista de termos
+  em `evo-plano-classificacao.ts`, `TERMOS_TURMA`): usa a matrícula real do
+  aluno (`GET /api/v1/activities/enrollment/member-enrollment`), com
+  tolerância de -30/+20 min em volta do horário específico da turma dele.
+  **Pegadinha confirmada**: os nomes de campo da resposta real vêm em
+  camelCase (`weekDay`/`startTime`/`endTime`), mas a tabela da documentação
+  da EVO mostra PascalCase (`WeekDay`/`StartTime`/`EndTime`) — usar o nome
+  errado silenciosamente salva objeto vazio (sem erro, sem warning). Mesmo
+  padrão de doc-vs-realidade divergente já visto em outros endpoints.
+- **Prioridade**: se o aluno tem **qualquer** contrato ativo "livre" (nem
+  Hora Certa, nem turma), libera sempre — mesmo tendo também um contrato
+  restrito. Classificação por nome do plano contra o catálogo local
+  (`EvoPlano`), confirmada com o dono da academia contra os 244 planos
+  ativos reais.
+- **Arquitetura**: a decisão em `access-handler.ts` continua 100% local
+  (nunca chama a EVO na hora da passagem) — dois jobs sincronizam
+  periodicamente (mas **não automaticamente ainda**, ver abaixo) os dados
+  brutos pro Mongo: `evo-membership-sync.ts` (`idMembershipsAtivos` por
+  aluno) e `evo-turma-sync.ts` (`turmaHorarios`, só de quem ficou
+  classificado "turma"). A classificação em si (`evo-plano-classificacao.ts`)
+  não é cacheada — é recalculada a cada passagem a partir do `EvoPlano` já
+  sincronizado, pra não duplicar a lógica de classificação em dois lugares.
+- **Custo de API real, medido em 2026-07-15**: `evo-membership-sync` fez
+  ~662 chamadas (uma por aluno ativo — o endpoint em lote, sem filtro de
+  `idMember`, traz dezenas de milhares de contratos históricos já vencidos
+  que a EVO nunca marcou como cancelado, inviável de paginar tudo).
+  `evo-turma-sync` fez outras ~637 chamadas e **bateu rate limit real (429)**
+  seguido — resolvido com retry e backoff maior especificamente pra 429
+  (`ESPERA_RATE_LIMIT_MS`). **Por isso os dois jobs não rodam sozinhos** —
+  só via `POST /catraca/sincronizar-memberships` e `/catraca/
+  sincronizar-turmas`, manual. Antes de automatizar, decidir uma cadência
+  seguindo o limite real da chave (perguntar se a academia está no plano
+  API Pro ou API Plus — grátis, 100 requisições/dia).
+
 ## Bugs/gotchas encontrados
 
 - **Prisma + MongoDB**: campo `DateTime?` (ex.: `removidoEm`) que nunca foi
@@ -397,3 +446,8 @@ nssm remove CatracaApi confirm
    `setuserinfo`, não dá mais pra resolver só adivinhando campos.
 6. Só depois de tudo validado e estável: conversar sobre desativar o
    sistema antigo da EVO em `192.168.1.12`.
+7. **Restrição de horário (Hora Certa/turma)**: confirmar se a chave da EVO
+   está no plano API Pro ou API Plus (100 req/dia) antes de automatizar
+   `evo-membership-sync`/`evo-turma-sync` — hoje só rodam manual (ver seção
+   acima). Também falta calendário de feriados (linha "Feriado" da tabela
+   Hora Certa não é aplicada).
