@@ -1,14 +1,34 @@
 import { db } from "../db.js";
 import { autorizarEntradaEvo, PERSON_TYPE_CLIENTE, PERSON_TYPE_COLABORADOR } from "./evo-access-control.js";
 import { validarCheckInWellhub, wellhubConfigurado } from "./wellhub-access-control.js";
+import { classificarAlunoPorPlanosAtivos } from "./evo-plano-classificacao.js";
+import { dentroDoHorarioHoraCerta, dentroDoHorarioTurma, type TurmaHorario } from "./horario-restricao.js";
 import type { SendLogMessage, SendLogRecord } from "./protocol.js";
 
 export interface AccessDecision {
   enrollid: number;
   access: boolean;
-  motivo: "ok" | "plano_inativo" | "nao_cadastrado" | "wellhub_provisorio" | "wellhub_ok";
+  motivo: "ok" | "plano_inativo" | "nao_cadastrado" | "wellhub_provisorio" | "wellhub_ok" | "fora_do_horario";
   /** Só presente quando access=true — gravado no log pra sincronizar com a EVO depois (ver NOTES.md). */
   personType?: number;
+}
+
+/**
+ * Checa restrição de horário (Hora Certa / turma) — só pra "aluno", nunca
+ * pra colaborador. Sempre local (classificação via `EvoPlano` já
+ * sincronizado + cálculo de data), nunca chama a EVO nesse caminho. Ver
+ * horario-restricao.ts e evo-plano-classificacao.ts.
+ */
+async function liberadoPorHorario(aluno: { idMembershipsAtivos: number[]; turmaHorarios: unknown }): Promise<boolean> {
+  const classificacao = await classificarAlunoPorPlanosAtivos(aluno.idMembershipsAtivos);
+  if (classificacao === "livre") {
+    return true;
+  }
+  if (classificacao === "horaCerta") {
+    return dentroDoHorarioHoraCerta(new Date());
+  }
+  const turmas = Array.isArray(aluno.turmaHorarios) ? (aluno.turmaHorarios as TurmaHorario[]) : [];
+  return dentroDoHorarioTurma(new Date(), turmas);
 }
 
 /** Registros mais antigos que isso são backlog acumulado (reader ficou
@@ -49,6 +69,9 @@ async function decidirAcesso(enrollid: number): Promise<AccessDecision> {
   const personType = aluno.tipo === "colaborador" ? PERSON_TYPE_COLABORADOR : PERSON_TYPE_CLIENTE;
 
   if (aluno.ativo) {
+    if (aluno.tipo === "aluno" && !(await liberadoPorHorario(aluno))) {
+      return { enrollid, access: false, motivo: "fora_do_horario", personType };
+    }
     return { enrollid, access: true, motivo: "ok", personType };
   }
 

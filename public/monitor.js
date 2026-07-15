@@ -16,6 +16,7 @@ const ROTULOS = {
   wellhub_provisorio: "Acesso liberado — Wellhub (provisório)",
   plano_inativo: "Plano inativo — negado",
   nao_cadastrado: "Não cadastrado — negado",
+  fora_do_horario: "Fora do horário do plano — negado",
 };
 
 const MOTIVOS_WELLHUB = new Set(["wellhub_ok", "wellhub_provisorio"]);

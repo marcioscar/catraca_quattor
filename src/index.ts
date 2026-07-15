@@ -7,6 +7,12 @@ import { startCatracaWsServer } from "./catraca/ws-server.js";
 import { startEvoSyncJob } from "./catraca/evo-sync-job.js";
 import { carregarCacheInicial } from "./catraca/known-aluno-cache.js";
 
+// Sync de restrição de horário (Hora Certa/turma) NÃO inicia automaticamente
+// ainda — faz ~1000-1500 chamadas à EVO por rodada (uma por aluno ativo),
+// caro demais pra automatizar sem antes confirmar o limite diário da chave
+// de integração (ver NOTES.md, "API Plus" free tier = só 100/dia). Disparar
+// manualmente por enquanto: POST /catraca/sincronizar-memberships.
+
 const app = Fastify({ logger: true });
 
 app.get("/health", async () => {

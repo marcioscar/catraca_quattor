@@ -64,6 +64,7 @@ async function carregarAcessos() {
     wellhub_provisorio: "Liberado — Wellhub (provisório)",
     plano_inativo: "Plano inativo",
     nao_cadastrado: "Não cadastrado",
+    fora_do_horario: "Fora do horário do plano",
   };
   tabelaAcessosBody.innerHTML = "";
   for (const acesso of acessos) {

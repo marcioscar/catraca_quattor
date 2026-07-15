@@ -17,6 +17,8 @@ model CatracaAluno {
     wellhubId    String? // gympass_id do aluno na Wellhub, preenchido manualmente — usado pra validar check-in direto na API da Wellhub quando `ativo` é false
     fotoBase64   String? // vem do próprio device (senduser) ou capturada na recepção
     ativo        Boolean   @default(true) // sincronizado pelo job periódico de status EVO
+    idMembershipsAtivos Int[] @default([]) // idMembership dos contratos ativos (EVO) — sincronizado periodicamente, usado pra restrição de horário (ver horario-restricao.ts). Só relevante pra tipo "aluno".
+    turmaHorarios Json? // cache dos horários de turma (weekDay/startTime/endTime) — só preenchido quando todos os planos ativos são do tipo "turma" (ver evo-turma-sync.ts)
     enroladoEm   DateTime  @default(now())
     atualizadoEm DateTime  @updatedAt
     removidoEm   DateTime?
