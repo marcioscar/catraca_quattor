@@ -28,12 +28,24 @@ socket.on("message", (data) => {
   const message = JSON.parse(data.toString());
   if (message.ret === "reg") {
     console.log(`[fake-device] enviando sendlog para enrollid=${enrollid}`);
-    socket.send(JSON.stringify({ cmd: "sendlog", enrollid, time: new Date().toISOString() }));
+    // Mesmo formato do device real: lote com record[], time local recente.
+    const pad = (v: number) => String(v).padStart(2, "0");
+    const agora = new Date();
+    const time = `${agora.getFullYear()}-${pad(agora.getMonth() + 1)}-${pad(agora.getDate())} ${pad(agora.getHours())}:${pad(agora.getMinutes())}:${pad(agora.getSeconds())}`;
+    socket.send(
+      JSON.stringify({
+        cmd: "sendlog",
+        sn: "FAKE-DEVICE-001",
+        count: 1,
+        logindex: 0,
+        record: [{ enrollid, name: "", time, mode: 8, inout: 0, event: 0 }],
+      })
+    );
     return;
   }
 
   if (message.ret === "sendlog") {
-    console.log(`[fake-device] decisão: access=${message.access}`);
+    console.log(`[fake-device] resposta do servidor: access=${message.access} (undefined = sem decisão)`);
     socket.close();
   }
 });

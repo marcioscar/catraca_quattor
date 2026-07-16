@@ -110,13 +110,19 @@ export function buildRegAck(): string {
  * ecoar `count`/`logindex` recebidos segue a convenção já validada do `reg`
  * (campo `ret` + `result`) e é a suposição mais segura para o dispositivo
  * avançar o cursor de log em vez de reenviar o mesmo lote.
+ *
+ * `access` (opcional): decisão de liberação da roleta pro "Servidor Valida:
+ * Sim" (modo real). Só enviado numa passagem real-time única — pra backlog
+ * omitimos (a passagem já aconteceu). Formato NÃO confirmado contra o device
+ * real (a doc da TopData é incompleta): é um `access` booleano ADICIONADO ao
+ * ack normal (campos count/logindex preservados, então mesmo se o device
+ * ignorar o `access` ele continua avançando o cursor de log — no pior caso
+ * fica igual a antes, fail-open). Se não bloquear, tentar `access` como int
+ * 0/1, ou pedir a spec do "server validate" pra TopData.
  */
-export function buildSendLogAck(count: number, logindex: number): string {
-  return JSON.stringify({ ret: "sendlog", result: true, count, logindex });
-}
-
-export function buildAccessReply(enrollid: number, access: boolean): string {
-  return JSON.stringify({ ret: "sendlog", enrollid, access });
+export function buildSendLogAck(count: number, logindex: number, access?: boolean): string {
+  const base = { ret: "sendlog", result: true, count, logindex };
+  return JSON.stringify(access === undefined ? base : { ...base, access });
 }
 
 /**

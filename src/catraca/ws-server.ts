@@ -12,11 +12,33 @@ import {
   parseDeviceMessage,
 } from "./protocol.js";
 import { setActiveConnection, send, touchLastSeen } from "./connection-manager.js";
-import { handleSendLog } from "./access-handler.js";
+import { handleSendLog, isHistorico, type AccessDecision } from "./access-handler.js";
 import { importarAlunoDoDispositivo, importarFotoDoDispositivo } from "./enroll-service.js";
 import { jaConhecido, marcarPerguntadoSePrimeiraVez } from "./known-aluno-cache.js";
 import { registrarMensagem } from "./debug-log.js";
-import type { SendLogRecord } from "./protocol.js";
+import type { SendLogMessage, SendLogRecord } from "./protocol.js";
+
+/**
+ * Decisão de liberação da roleta pro modo "Servidor Valida: Sim" — só
+ * definida numa passagem real-time única (não backlog). Retorna `undefined`
+ * pra não enviar campo de acesso nenhum (ack normal) em backlog ou lote.
+ *
+ * **Fail-open pra enrollid desconhecido** (`nao_cadastrado`): quem está
+ * cadastrado no leitor mas ainda não é conhecido por nós é provavelmente
+ * membro legítimo ainda não importado — libera e loga pra revisão (estratégia
+ * de transição documentada no NOTES.md). Só bloqueia de fato quem a gente
+ * CONHECE e negou (inativo, fora do horário).
+ */
+function decisaoDeAcessoParaDevice(
+  message: SendLogMessage,
+  decisoes: AccessDecision[]
+): boolean | undefined {
+  if (message.record.length !== 1 || decisoes.length !== 1 || isHistorico(message.record[0])) {
+    return undefined;
+  }
+  const decisao = decisoes[0];
+  return decisao.access || decisao.motivo === "nao_cadastrado";
+}
 
 /** Backlog anterior a isso é ignorado para fins de importação — aluno que só
  * aparece antes disso muito provavelmente já não frequenta mais a academia. */
@@ -64,7 +86,11 @@ function handleMessage(socket: WebSocket, raw: string): void {
     handleSendLog(message)
       .then((decisoes) => {
         console.log(`[catraca] lote processado: ${decisoes.length} registro(s)`);
-        socket.send(buildSendLogAck(message.count ?? message.record.length, message.logindex ?? 0));
+        const count = message.count ?? message.record.length;
+        const logindex = message.logindex ?? 0;
+        const ack = buildSendLogAck(count, logindex, decisaoDeAcessoParaDevice(message, decisoes));
+        registrarMensagem("out", ack);
+        socket.send(ack);
       })
       .catch((error) => {
         console.error("[catraca] erro ao processar sendlog:", error);

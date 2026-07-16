@@ -36,7 +36,7 @@ async function liberadoPorHorario(aluno: { idMembershipsAtivos: number[]; turmaH
  * pra não inflar o histórico com dados antigos a cada reconexão. */
 const HISTORICO_LIMITE_MS = 10 * 60 * 1000;
 
-function isHistorico(record: SendLogRecord): boolean {
+export function isHistorico(record: SendLogRecord): boolean {
   if (!record.time) {
     return false;
   }
