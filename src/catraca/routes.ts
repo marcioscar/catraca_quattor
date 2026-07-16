@@ -8,6 +8,7 @@ import { sincronizarClientesEvo, getProgressoSincronizacaoClientes } from "./evo
 import { sincronizarPlanosEvo, getProgressoSincronizacaoPlanos } from "./evo-planos-sync.js";
 import { sincronizarMembershipsEvo, getProgressoSincronizacaoMembership } from "./evo-membership-sync.js";
 import { sincronizarTurmasEvo, getProgressoSincronizacaoTurmas } from "./evo-turma-sync.js";
+import { sincronizarDebitosEvo } from "./evo-debito-sync.js";
 import { NAO_REMOVIDO } from "./filtros.js";
 import { PERSON_TYPE_CLIENTE } from "./evo-access-control.js";
 import { getUltimasMensagens } from "./debug-log.js";
@@ -186,6 +187,18 @@ export async function catracaRoutes(app: FastifyInstance): Promise<void> {
   });
 
   app.get("/catraca/sincronizar-turmas", async () => getProgressoSincronizacaoTurmas());
+
+  // Débito vencido em aberto (bloqueia acesso) — roda sozinho a cada 10 min
+  // junto do sync de `ativo` (é barato). Rota aqui só pra forçar na hora.
+  app.post("/catraca/sincronizar-debitos", async (_request, reply) => {
+    try {
+      const total = await sincronizarDebitosEvo();
+      return { ok: true, comDebito: total };
+    } catch (error) {
+      reply.code(502);
+      return { ok: false, erro: error instanceof Error ? error.message : "falha ao sincronizar débitos" };
+    }
+  });
 
   app.get("/catraca/acessos", async (request) => {
     const query = request.query as { take?: string; dia?: string };

@@ -315,6 +315,23 @@ horário específicas — dois mecanismos diferentes na EVO:
   seguindo o limite real da chave (perguntar se a academia está no plano
   API Pro ou API Plus — grátis, 100 requisições/dia).
 
+## Bloqueio por saldo devedor (2026-07-16)
+
+- **Regra confirmada com o dono**: qualquer débito vencido em aberto trava o
+  acesso, mesmo aluno ativo (sem carência de dias). Só pra `tipo: "aluno"`.
+- **Fonte**: `GET /api/v1/receivables/debtors?debtStatus=1&memberStatus=1`
+  (relatório de inadimplência). Endpoint em LOTE e barato (~2 páginas pra
+  academia toda — eram 39 membros / 69 dívidas em 2026-07-16), então
+  `evo-debito-sync.ts` **roda automático** junto do sync de `ativo`
+  (evo-sync-job.ts, 10 min) — diferente dos syncs de horário que são
+  caros/manuais.
+- **Como funciona**: o sync marca `CatracaAluno.comDebito` (true pra quem tem
+  dívida com `daysLate > 0`, false pro resto — quem paga é desbloqueado no
+  próximo ciclo). `access-handler` lê o flag local e nega com motivo
+  `saldo_devedor` (nunca chama a EVO na hora da passagem). Só zera os flags
+  se a varredura terminou inteira (falha de rede não libera geral).
+- Rota manual pra forçar: `POST /catraca/sincronizar-debitos`.
+
 ## Bugs/gotchas encontrados
 
 - **A EVO troca a versão dos endpoints sem aviso** — descoberto em

@@ -8,7 +8,7 @@ import type { SendLogMessage, SendLogRecord } from "./protocol.js";
 export interface AccessDecision {
   enrollid: number;
   access: boolean;
-  motivo: "ok" | "plano_inativo" | "nao_cadastrado" | "wellhub_provisorio" | "wellhub_ok" | "fora_do_horario";
+  motivo: "ok" | "plano_inativo" | "nao_cadastrado" | "wellhub_provisorio" | "wellhub_ok" | "fora_do_horario" | "saldo_devedor";
   /** Só presente quando access=true — gravado no log pra sincronizar com a EVO depois (ver NOTES.md). */
   personType?: number;
 }
@@ -69,6 +69,12 @@ async function decidirAcesso(enrollid: number): Promise<AccessDecision> {
   const personType = aluno.tipo === "colaborador" ? PERSON_TYPE_COLABORADOR : PERSON_TYPE_CLIENTE;
 
   if (aluno.ativo) {
+    // Débito vencido em aberto trava mesmo o aluno ativo (regra: qualquer
+    // atraso, ver NOTES.md). Só pra "aluno" — colaborador não tem débito de
+    // mensalidade, e o flag nunca é setado pra ele.
+    if (aluno.tipo === "aluno" && aluno.comDebito) {
+      return { enrollid, access: false, motivo: "saldo_devedor", personType };
+    }
     if (aluno.tipo === "aluno" && !(await liberadoPorHorario(aluno))) {
       return { enrollid, access: false, motivo: "fora_do_horario", personType };
     }

@@ -1,5 +1,6 @@
 import { db } from "../db.js";
 import { fetchIdEmployeesAtivos, fetchIdMembersAtivos } from "./evo-active-members.js";
+import { sincronizarDebitosEvo } from "./evo-debito-sync.js";
 import { NAO_REMOVIDO } from "./filtros.js";
 
 const DEFAULT_INTERVAL_MS = 10 * 60 * 1000;
@@ -47,10 +48,13 @@ async function syncAtivos(): Promise<void> {
   ]);
 }
 
-export function startEvoSyncJob(intervalMs = DEFAULT_INTERVAL_MS): void {
-  syncAtivos().catch((error) => console.error("[catraca] erro no sync inicial da EVO:", error));
+/** Roda `ativo` e `comDebito` de forma independente — falha de um não impede o outro. */
+function rodarSyncs(): void {
+  syncAtivos().catch((error) => console.error("[catraca] erro no sync de ativos:", error));
+  sincronizarDebitosEvo().catch((error) => console.error("[catraca] erro no sync de débitos:", error));
+}
 
-  setInterval(() => {
-    syncAtivos().catch((error) => console.error("[catraca] erro no sync periódico da EVO:", error));
-  }, intervalMs);
+export function startEvoSyncJob(intervalMs = DEFAULT_INTERVAL_MS): void {
+  rodarSyncs();
+  setInterval(rodarSyncs, intervalMs);
 }
