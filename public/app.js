@@ -11,9 +11,25 @@ const tabelaAlunosBody = document.querySelector("#tabela-alunos tbody");
 const tabelaAcessosBody = document.querySelector("#tabela-acessos tbody");
 const tipoToggleEl = document.getElementById("tipo-toggle");
 const acessosFiltroEl = document.getElementById("acessos-filtro");
+const acessosDiaEl = document.getElementById("acessos-dia");
+const acessosDiaLimparEl = document.getElementById("acessos-dia-limpar");
 
 function filtroAcessosSelecionado() {
   return acessosFiltroEl.querySelector('input[name="filtro-acessos"]:checked').value;
+}
+
+function iniciais(nome) {
+  const partes = (nome ?? "").trim().split(/\s+/).filter(Boolean);
+  if (partes.length === 0) return "?";
+  if (partes.length === 1) return partes[0][0].toUpperCase();
+  return (partes[0][0] + partes[partes.length - 1][0]).toUpperCase();
+}
+
+function celulaAvatar(acesso) {
+  if (acesso.fotoBase64) {
+    return `<img class="avatar-mini" src="${acesso.fotoBase64}" alt="" />`;
+  }
+  return `<span class="avatar-mini avatar-mini-iniciais">${iniciais(acesso.nome)}</span>`;
 }
 
 function tipoSelecionado() {
@@ -61,7 +77,10 @@ async function carregarAlunos() {
 }
 
 async function carregarAcessos() {
-  const resposta = await fetch("/catraca/acessos?take=50");
+  const dia = acessosDiaEl.value;
+  const params = new URLSearchParams({ take: dia ? "500" : "50" });
+  if (dia) params.set("dia", dia);
+  const resposta = await fetch(`/catraca/acessos?${params}`);
   const acessos = await resposta.json();
   const rotulos = {
     ok: "Liberado",
@@ -77,13 +96,14 @@ async function carregarAcessos() {
   tabelaAcessosBody.innerHTML = "";
   if (lista.length === 0) {
     const tr = document.createElement("tr");
-    tr.innerHTML = `<td colspan="4" class="detalhe">${soNegados ? "Nenhum acesso negado nos últimos registros." : "Nenhum acesso registrado ainda."}</td>`;
+    tr.innerHTML = `<td colspan="5" class="detalhe">${soNegados ? "Nenhum acesso negado neste período." : "Nenhum acesso registrado neste período."}</td>`;
     tabelaAcessosBody.appendChild(tr);
     return;
   }
   for (const acesso of lista) {
     const tr = document.createElement("tr");
     tr.innerHTML = `
+      <td>${celulaAvatar(acesso)}</td>
       <td>${formatDataHora(acesso.ocorridoEm)}</td>
       <td>${acesso.nome ?? "-"}</td>
       <td>${acesso.idMember}</td>
@@ -226,9 +246,20 @@ tabelaAlunosBody.addEventListener("click", (event) => {
 });
 
 acessosFiltroEl.addEventListener("change", carregarAcessos);
+acessosDiaEl.addEventListener("change", carregarAcessos);
+acessosDiaLimparEl.addEventListener("click", () => {
+  acessosDiaEl.value = "";
+  carregarAcessos();
+});
 
 atualizarStatus();
 carregarAlunos();
 carregarAcessos();
 setInterval(atualizarStatus, 15000);
-setInterval(carregarAcessos, 5000);
+// Auto-refresh só quando está vendo os acessos ao vivo (sem dia fixado) —
+// com um dia selecionado, é consulta a histórico, não precisa recarregar.
+setInterval(() => {
+  if (!acessosDiaEl.value) {
+    carregarAcessos();
+  }
+}, 5000);

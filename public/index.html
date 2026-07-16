@@ -16,13 +16,20 @@
 
     <section class="card">
       <h2>Últimos acessos</h2>
-      <div id="acessos-filtro" class="tipo-toggle">
-        <label><input type="radio" name="filtro-acessos" value="todos" checked /> Todos</label>
-        <label><input type="radio" name="filtro-acessos" value="negados" /> Só negados</label>
+      <div class="acessos-controles">
+        <div id="acessos-filtro" class="tipo-toggle">
+          <label><input type="radio" name="filtro-acessos" value="todos" checked /> Todos</label>
+          <label><input type="radio" name="filtro-acessos" value="negados" /> Só negados</label>
+        </div>
+        <label class="filtro-dia">
+          Dia:
+          <input id="acessos-dia" type="date" />
+          <button id="acessos-dia-limpar" type="button" class="secundario">Hoje</button>
+        </label>
       </div>
       <table id="tabela-acessos">
         <thead>
-          <tr><th>Quando</th><th>Aluno</th><th>ID</th><th>Resultado</th></tr>
+          <tr><th></th><th>Quando</th><th>Aluno</th><th>ID</th><th>Resultado</th></tr>
         </thead>
         <tbody></tbody>
       </table>

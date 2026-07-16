@@ -60,6 +60,56 @@ header h1 {
   cursor: pointer;
 }
 
+.acessos-controles {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.acessos-controles .tipo-toggle {
+  margin-bottom: 0;
+}
+
+.filtro-dia {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+}
+
+.filtro-dia input[type="date"] {
+  padding: 6px 8px;
+  border: 1px solid #d4d4d8;
+  border-radius: 8px;
+  font-size: 0.9rem;
+}
+
+.filtro-dia button {
+  padding: 6px 12px;
+  font-size: 0.85rem;
+}
+
+.avatar-mini {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #e4e4e7;
+  vertical-align: middle;
+}
+
+.avatar-mini-iniciais {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #71717a;
+}
+
 #form-busca {
   display: flex;
   gap: 8px;

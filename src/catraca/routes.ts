@@ -188,9 +188,22 @@ export async function catracaRoutes(app: FastifyInstance): Promise<void> {
   app.get("/catraca/sincronizar-turmas", async () => getProgressoSincronizacaoTurmas());
 
   app.get("/catraca/acessos", async (request) => {
-    const query = request.query as { take?: string };
-    const take = Math.min(Number(query.take) || 50, 200);
+    const query = request.query as { take?: string; dia?: string };
+    const take = Math.min(Number(query.take) || 50, 500);
+
+    // Filtro opcional por dia (YYYY-MM-DD, hora local do servidor).
+    let filtroDia: { ocorridoEm: { gte: Date; lt: Date } } | undefined;
+    if (query.dia && /^\d{4}-\d{2}-\d{2}$/.test(query.dia)) {
+      const inicio = new Date(`${query.dia}T00:00:00`);
+      const fim = new Date(inicio);
+      fim.setDate(fim.getDate() + 1);
+      if (!Number.isNaN(inicio.getTime())) {
+        filtroDia = { ocorridoEm: { gte: inicio, lt: fim } };
+      }
+    }
+
     const acessos = await db.catracaAcessoLog.findMany({
+      where: filtroDia,
       orderBy: { ocorridoEm: "desc" },
       take,
     });
