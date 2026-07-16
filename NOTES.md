@@ -38,6 +38,21 @@ confirmado observando tráfego real:
   `logindex`), não um evento por mensagem. Precisa responder
   `{"ret":"sendlog","result":true,"count":N,"logindex":N}` ou o device fica
   reenviando o mesmo lote pra sempre (sem avançar).
+  - **`access` na resposta do `sendlog` = decisão da roleta (CONFIRMADO
+    contra o device real em 2026-07-16)**: com "Servidor Valida: Sim" no
+    leitor, uma passagem real-time (lote de 1 record, não backlog) espera a
+    nossa decisão de liberar/negar. É só **adicionar** um campo `access`
+    booleano ao ack normal: `{"ret":"sendlog","result":true,"count":1,
+    "logindex":0,"access":true|false}`. `access:false` **trava a roleta de
+    verdade** — testado ao vivo (aluno inativo travou; aluno fora do horário
+    Hora Certa travou; ativo liberou). Isso resolve o "modo real" que ficou
+    pendente desde o começo do projeto. Ver `buildSendLogAck` (campo `access`
+    opcional) + `decisaoDeAcessoParaDevice` em `ws-server.ts`.
+  - **Fail-open pra enrollid desconhecido**: `nao_cadastrado` responde
+    `access:true` (libera + loga) — quem está no leitor mas não no nosso
+    banco é provavelmente membro legítimo ainda não importado. Só trava quem
+    a gente CONHECE e negou (inativo, fora do horário). Backlog (`isHistorico`)
+    e lotes com +1 record não recebem `access` (a passagem já aconteceu).
 - `getuserinfo` (nós → device): pedimos por `enrollid`, ele responde
   `{"ret":"getuserinfo","enrollid":N,"name":"...","result":true}` (ou
   `result:false` com `"msg":"can not find the user"` se o enrollid não
@@ -110,17 +125,16 @@ confirmado observando tráfego real:
   `CatracaAcessoLog` registros com menos de 10 min — mais antigo que isso é
   considerado backlog e só é usado pra decidir (não persistido), evitando
   inflar o histórico a cada reconexão.
-- **`Servidor Valida` continua "Não"** neste momento — modo de teste seguro,
-  onde o device decide sozinho (como sempre fez) e só nos avisa em paralelo.
-  **Ainda não ligamos o modo real.** Antes de ligar, considerar: o que fazer
-  quando um `enrollid` desconhecido aparece (hoje = nega por padrão — risco
-  de barrar aluno ativo que ainda não foi importado). Foi discutida a ideia
-  de "desconhecido libera + loga pra revisão" como estratégia de transição,
-  mas **não implementada ainda**.
-- **Sistema antigo da EVO (via `192.168.1.12`) continua rodando em
-  paralelo** e é o que hoje realmente controla a roleta. O objetivo de longo
-  prazo do usuário é substituir esse sistema pelo daqui — mas isso só deve
-  ser feito depois que "Servidor Valida: Sim" estiver validado e estável.
+- **`Servidor Valida: Sim` VALIDADO e funcionando (2026-07-16).** O modo real
+  foi ligado e testado ao vivo: com o campo `access` na resposta do `sendlog`
+  (ver seção Protocolo acima), a roleta trava de verdade quando negamos —
+  confirmado com aluno inativo e aluno fora do horário Hora Certa, e liberando
+  o ativo. A estratégia "desconhecido (`nao_cadastrado`) libera + loga pra
+  revisão" **foi implementada** (fail-open pra enrollid que não conhecemos).
+- **Sistema antigo da EVO (via `192.168.1.12`) ainda roda em paralelo** — o
+  leitor facial já valida contra o nosso sistema, mas o sistema antigo segue
+  ligado (não desativado). Próximo passo de longo prazo: desativar de vez
+  depois de um período de "Servidor Valida: Sim" estável em produção.
 
 ## Colaboradores vs alunos (colisão de id)
 
@@ -453,7 +467,10 @@ nssm remove CatracaApi confirm
    rodando, poluindo o relatório de "liberações manuais" da EVO sem nunca
    virar uma entrada de verdade — decisão do usuário, ver conversa de
    2026-07-10).
-4. Ligar `Servidor Valida: Sim` no menu do leitor facial.
+4. ~~Ligar `Servidor Valida: Sim`~~ — **feito e validado em 2026-07-16** (ver
+   "Decisões de arquitetura" e "Protocolo" acima). A roleta trava de verdade
+   quando negamos. Falta só rodar um período estável em produção antes de
+   pensar em desativar o sistema antigo.
 5. ~~Validar `setuserinfo` contra o device real~~ — **validado em
    2026-07-14, não funciona** (ver seção "Protocolo" acima). Cadastro de
    rosto por enquanto só pelo painel touch do leitor. Se algum dia quiser
