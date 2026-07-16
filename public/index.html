@@ -15,6 +15,20 @@
     </header>
 
     <section class="card">
+      <h2>Últimos acessos</h2>
+      <div id="acessos-filtro" class="tipo-toggle">
+        <label><input type="radio" name="filtro-acessos" value="todos" checked /> Todos</label>
+        <label><input type="radio" name="filtro-acessos" value="negados" /> Só negados</label>
+      </div>
+      <table id="tabela-acessos">
+        <thead>
+          <tr><th>Quando</th><th>Aluno</th><th>ID</th><th>Resultado</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </section>
+
+    <section class="card">
       <h2>Cadastrar aluno ou colaborador</h2>
       <p class="detalhe">
         O rosto é cadastrado direto no painel touch do leitor (o cadastro remoto
@@ -50,15 +64,6 @@
       </table>
     </section>
 
-    <section class="card">
-      <h2>Últimos acessos</h2>
-      <table id="tabela-acessos">
-        <thead>
-          <tr><th>Quando</th><th>Aluno</th><th>ID</th><th>Resultado</th></tr>
-        </thead>
-        <tbody></tbody>
-      </table>
-    </section>
   </main>
 
   <script src="/app.js"></script>

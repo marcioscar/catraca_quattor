@@ -10,6 +10,11 @@ const btnCadastrar = document.getElementById("btn-cadastrar");
 const tabelaAlunosBody = document.querySelector("#tabela-alunos tbody");
 const tabelaAcessosBody = document.querySelector("#tabela-acessos tbody");
 const tipoToggleEl = document.getElementById("tipo-toggle");
+const acessosFiltroEl = document.getElementById("acessos-filtro");
+
+function filtroAcessosSelecionado() {
+  return acessosFiltroEl.querySelector('input[name="filtro-acessos"]:checked').value;
+}
 
 function tipoSelecionado() {
   return tipoToggleEl.querySelector('input[name="tipo-cadastro"]:checked').value;
@@ -66,8 +71,17 @@ async function carregarAcessos() {
     nao_cadastrado: "Não cadastrado",
     fora_do_horario: "Fora do horário do plano",
   };
+  const soNegados = filtroAcessosSelecionado() === "negados";
+  const lista = soNegados ? acessos.filter((a) => !a.permitido) : acessos;
+
   tabelaAcessosBody.innerHTML = "";
-  for (const acesso of acessos) {
+  if (lista.length === 0) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td colspan="4" class="detalhe">${soNegados ? "Nenhum acesso negado nos últimos registros." : "Nenhum acesso registrado ainda."}</td>`;
+    tabelaAcessosBody.appendChild(tr);
+    return;
+  }
+  for (const acesso of lista) {
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td>${formatDataHora(acesso.ocorridoEm)}</td>
@@ -211,8 +225,10 @@ tabelaAlunosBody.addEventListener("click", (event) => {
   }
 });
 
+acessosFiltroEl.addEventListener("change", carregarAcessos);
+
 atualizarStatus();
 carregarAlunos();
 carregarAcessos();
 setInterval(atualizarStatus, 15000);
-setInterval(carregarAcessos, 15000);
+setInterval(carregarAcessos, 5000);
