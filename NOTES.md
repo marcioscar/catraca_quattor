@@ -391,14 +391,25 @@ seção "Migração do MongoDB" e [[catraca-api-proximos-passos]] pro contexto:
 esse é o mesmo PC (`192.168.1.12`) que já roda o sistema antigo da EVO
 controlando a roleta, os dois convivem até o novo ser validado.
 
-**Atualizar o app com uma versão nova do código** (PowerShell como
-Administrador):
+**Atualizar o app com uma versão nova do código** — usar o script
+`deploy.ps1` (na raiz do repo), PowerShell como Administrador:
+```powershell
+powershell -ExecutionPolicy Bypass -File C:\catraca-api\deploy.ps1
+```
+Ele faz tudo (stop → git pull → npm install → prisma generate → db push →
+build → start → health check) e, se algum passo falhar, **aborta sem subir
+código quebrado** e religa a versão anterior. Da primeira vez, como o
+próprio script vem via `git pull`, rodar o passo-a-passo manual uma vez pra
+trazer o `deploy.ps1`, depois é só o comando acima.
+
+Passo-a-passo manual (equivalente, caso precise):
 ```powershell
 cd C:\catraca-api
 nssm stop CatracaApi
 git pull
 npm install
 npx prisma generate
+npx prisma db push
 npm run build
 nssm start CatracaApi
 nssm status CatracaApi
