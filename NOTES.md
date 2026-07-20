@@ -214,11 +214,22 @@ confirmado observando tráfego real:
   `CatracaAluno` + rota `PATCH /catraca/alunos/:idMember/wellhub-id` pra
   cadastrar manualmente. `decidirAcesso` tenta Wellhub primeiro quando o
   aluno tem `wellhubId`, senão cai no fallback EVO de sempre.
-- **Pendências antes de funcionar de verdade**:
-  1. **Credenciais** (`WELLHUB_ACCESS_TOKEN`, `WELLHUB_GYM_ID`) — ainda não
-     solicitadas. Pedir ao Tech Sales da Wellhub
-     (`integrations@gympass.com`) ou via Help Center ("solicitar token de
-     integração da academia").
+- **PRODUÇÃO VALIDADA (2026-07-20)**: token de produção + `WELLHUB_GYM_ID=6249`
+  (⚠️ **o Gym ID de produção é DIFERENTE do sandbox** — sandbox era 538;
+  passamos ~1h achando que o token estava errado, dava `401 Unauthorized` no
+  gateway istio-envoy mesmo sem X-Gym-Id, mas era o Gym ID de sandbox sendo
+  usado contra o host de produção). Com o Gym ID certo, `/validate` autentica
+  (404 "Check-In not found" pra id inexistente = auth OK). Confirmado ao vivo:
+  aluna Wellhub que fez check-in passou com motivo `wellhub_ok` (validação
+  real), enquanto antes de configurar as credenciais no PC da catraca as
+  passagens vinham como `wellhub_provisorio` (fail-open). Host produção:
+  `https://api.partners.gympass.com` (o `api.partners.wellhub.com` nem
+  resolve). Credenciais ficam no `.env` do PC da catraca (gitignored, não vai
+  no git — cada máquina tem o seu).
+- ~~**Pendências antes de funcionar de verdade**~~ (resolvidas):
+  1. ~~**Credenciais**~~ — recebidas e configuradas em produção (2026-07-20,
+     ver acima). Token de produção veio do Tech Sales da Wellhub (Marco Ende)
+     via onetimesecret.
   2. **Origem do `gympass_id` por aluno** — **resolvido, dá pra fazer em
      lote**: a EVO tem um **relatório de check-ins Wellhub** exportável em
      CSV (colunas `ID` = idMember, `ID Agregador` = gympass_id, entre
