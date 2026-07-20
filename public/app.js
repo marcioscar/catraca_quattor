@@ -90,6 +90,7 @@ async function carregarAcessos() {
     nao_cadastrado: "Não cadastrado",
     fora_do_horario: "Fora do horário do plano",
     saldo_devedor: "Saldo devedor",
+    wellhub_manual: "Wellhub (validado manual)",
   };
   const soNegados = filtroAcessosSelecionado() === "negados";
   const lista = soNegados ? acessos.filter((a) => !a.permitido) : acessos;

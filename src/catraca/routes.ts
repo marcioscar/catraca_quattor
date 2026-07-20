@@ -9,6 +9,7 @@ import { sincronizarPlanosEvo, getProgressoSincronizacaoPlanos } from "./evo-pla
 import { sincronizarMembershipsEvo, getProgressoSincronizacaoMembership } from "./evo-membership-sync.js";
 import { sincronizarTurmasEvo, getProgressoSincronizacaoTurmas } from "./evo-turma-sync.js";
 import { sincronizarDebitosEvo } from "./evo-debito-sync.js";
+import { listarCheckinsDoDia, validarCheckinManual } from "./wellhub-checkins.js";
 import { NAO_REMOVIDO } from "./filtros.js";
 import { PERSON_TYPE_CLIENTE } from "./evo-access-control.js";
 import { getUltimasMensagens } from "./debug-log.js";
@@ -198,6 +199,25 @@ export async function catracaRoutes(app: FastifyInstance): Promise<void> {
       reply.code(502);
       return { ok: false, erro: error instanceof Error ? error.message : "falha ao sincronizar débitos" };
     }
+  });
+
+  // Check-ins Wellhub do dia (validados na catraca x não validados), pra tela
+  // /wellhub.html. Fonte: coleção WellhubCheckin (escrita pelo webhook do
+  // recepcao, ver wellhub-checkins.ts).
+  app.get("/catraca/wellhub/checkins", async (request) => {
+    const query = request.query as { dia?: string };
+    return listarCheckinsDoDia(query.dia);
+  });
+
+  // Validação manual (recepção confirma quem está na academia mas não passou
+  // na catraca) — chama o /validate da Wellhub e loga como wellhub_manual.
+  app.post<{ Body: { gympassId?: string } }>("/catraca/wellhub/validar", async (request, reply) => {
+    const gympassId = request.body?.gympassId?.trim();
+    if (!gympassId) {
+      reply.code(400);
+      return { ok: false, mensagem: "Informe o gympassId." };
+    }
+    return validarCheckinManual(gympassId);
   });
 
   app.get("/catraca/acessos", async (request) => {

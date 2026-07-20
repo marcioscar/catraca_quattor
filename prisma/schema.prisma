@@ -112,6 +112,23 @@ model EvoPlano {
     atualizadoEm   DateTime @updatedAt
 }
 
+// Eventos de check-in recebidos via webhook da Wellhub. **Escrito pelo
+// projeto `recepcao`** (apps/web/app/routes/webhooks.wellhub.ts, que roda na
+// VPS pública) — o catraca-api só LÊ, pra montar a tela de check-ins
+// (/wellhub.html). Mesma coleção no Mongo compartilhado (mesmo nome de
+// model, sem @@map, então mapeia pra collection "WellhubCheckin").
+model WellhubCheckin {
+    id         String   @id @default(auto()) @map("_id") @db.ObjectId
+    evento     String?
+    gympassId  String?
+    bookingId  String?
+    payload    Json?
+    recebidoEm DateTime @default(now())
+
+    @@index([gympassId])
+    @@index([recebidoEm])
+}
+
 model CatracaAcessoLog {
     id         String   @id @default(auto()) @map("_id") @db.ObjectId
     idMember   Int // == enrollid recebido no sendlog

@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Catraca — check-ins Wellhub</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <main>
+    <header>
+      <h1>Check-ins Wellhub</h1>
+      <a href="/" class="link-monitor">← Voltar ao cadastro</a>
+    </header>
+
+    <section class="card">
+      <h2>Check-ins do dia</h2>
+      <div class="acessos-controles">
+        <div id="checkins-filtro" class="tipo-toggle">
+          <label><input type="radio" name="filtro-checkins" value="todos" checked /> Todos</label>
+          <label><input type="radio" name="filtro-checkins" value="nao_validados" /> Não validados</label>
+        </div>
+        <label class="filtro-dia">
+          Dia:
+          <input id="checkins-dia" type="date" />
+          <button id="checkins-dia-limpar" type="button" class="secundario">Hoje</button>
+        </label>
+      </div>
+      <p id="checkins-mensagem" class="detalhe"></p>
+      <table id="tabela-checkins">
+        <thead>
+          <tr><th></th><th>Check-in</th><th>Aluno</th><th>Status</th><th></th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </section>
+  </main>
+
+  <script src="/wellhub.js"></script>
+</body>
+</html>

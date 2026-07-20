@@ -14,6 +14,7 @@ const ROTULOS = {
   ok: "Acesso liberado",
   wellhub_ok: "Acesso liberado — Wellhub",
   wellhub_provisorio: "Acesso liberado — Wellhub (provisório)",
+  wellhub_manual: "Acesso liberado — Wellhub (manual)",
   plano_inativo: "Plano inativo — negado",
   nao_cadastrado: "Não cadastrado — negado",
   fora_do_horario: "Fora do horário do plano — negado",
