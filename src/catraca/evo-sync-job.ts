@@ -1,6 +1,7 @@
 import { db } from "../db.js";
 import { fetchIdEmployeesAtivos, fetchIdMembersAtivos } from "./evo-active-members.js";
 import { sincronizarDebitosEvo } from "./evo-debito-sync.js";
+import { sincronizarPersonais } from "./personal-sync.js";
 import { NAO_REMOVIDO } from "./filtros.js";
 
 const DEFAULT_INTERVAL_MS = 10 * 60 * 1000;
@@ -34,7 +35,10 @@ async function syncAtivos(): Promise<void> {
     return;
   }
 
-  const alunos = cadastrados.filter((registro) => registro.tipo !== "colaborador");
+  // Personal (tipo "personal") tem `ativo` vindo da validade do contrato
+  // (personal-sync.ts) — não sincroniza contra member/employee (o enrollid
+  // dele colide com outra pessoa, daria status errado).
+  const alunos = cadastrados.filter((r) => r.tipo !== "colaborador" && r.tipo !== "personal");
   const colaboradores = cadastrados.filter((registro) => registro.tipo === "colaborador");
 
   const [idsAlunosAtivos, idsColaboradoresAtivos] = await Promise.all([
@@ -48,10 +52,11 @@ async function syncAtivos(): Promise<void> {
   ]);
 }
 
-/** Roda `ativo` e `comDebito` de forma independente — falha de um não impede o outro. */
+/** Roda os syncs de forma independente — falha de um não impede os outros. */
 function rodarSyncs(): void {
   syncAtivos().catch((error) => console.error("[catraca] erro no sync de ativos:", error));
   sincronizarDebitosEvo().catch((error) => console.error("[catraca] erro no sync de débitos:", error));
+  sincronizarPersonais().catch((error) => console.error("[catraca] erro no sync de personais:", error));
 }
 
 export function startEvoSyncJob(intervalMs = DEFAULT_INTERVAL_MS): void {

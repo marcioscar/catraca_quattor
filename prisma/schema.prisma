@@ -112,6 +112,25 @@ model EvoPlano {
     atualizadoEm   DateTime @updatedAt
 }
 
+// Personal trainers — coleção **escrita por um processo externo** (sync da
+// EVO fora deste projeto), o catraca-api só LÊ. `evoPersonalId` é a
+// "Carteirinha" do personal na EVO, que vira o enrollid no leitor facial
+// (espaço de id próprio, que colide com member/employee — ver NOTES.md).
+// `contratos[]` traz as janelas de contrato pra decidir liberação por
+// validade. Sem @@index/@unique de propósito (não gerenciamos essa coleção).
+type PersonalContrato {
+    inicio DateTime
+    fim    DateTime
+    tipo   String?
+}
+
+model Personal {
+    id            String             @id @default(auto()) @map("_id") @db.ObjectId
+    evoPersonalId Int
+    nome          String?
+    contratos     PersonalContrato[]
+}
+
 // Eventos de check-in recebidos via webhook da Wellhub. **Escrito pelo
 // projeto `recepcao`** (apps/web/app/routes/webhooks.wellhub.ts, que roda na
 // VPS pública) — o catraca-api só LÊ, pra montar a tela de check-ins

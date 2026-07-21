@@ -90,6 +90,7 @@ async function carregarAcessos() {
     nao_cadastrado: "Não cadastrado",
     fora_do_horario: "Fora do horário do plano",
     saldo_devedor: "Saldo devedor",
+    personal_vencido: "Personal — contrato vencido",
     wellhub_manual: "Wellhub (validado manual)",
   };
   const soNegados = filtroAcessosSelecionado() === "negados";

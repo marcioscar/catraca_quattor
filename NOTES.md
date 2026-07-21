@@ -136,6 +136,32 @@ confirmado observando tráfego real:
   ligado (não desativado). Próximo passo de longo prazo: desativar de vez
   depois de um período de "Servidor Valida: Sim" estável em produção.
 
+## Personal trainers (coleção `Personal`, 2026-07-21)
+
+- Personais passam no leitor com enrollid = a **"Carteirinha"** deles na EVO
+  (campo `evoPersonalId` na coleção `Personal`) — um **quarto espaço de id**,
+  que colide com member/employee de OUTRA pessoa. Ex.: enrollid 119 = personal
+  ITALO, mas member 119 = Giovanna (inativa) e employee 119 = Maiara
+  (bloqueada) — por isso a enriquecimento automática marcava 119 como "Maiara
+  inativa" e o personal seria barrado.
+- **Não tem endpoint de API** pra esse cadastro (procuramos). A solução: uma
+  coleção `Personal` no Mongo compartilhado, **escrita por um processo externo**
+  (sync da EVO fora deste projeto — o catraca-api só LÊ). Cada doc tem
+  `evoPersonalId`, `nome` e `contratos[]` (`inicio`/`fim`).
+- **Liberação por validade de contrato**: personal entra se tem algum contrato
+  com `inicio <= agora` e `fim >= início de hoje` (pega renovação — checa todos
+  os contratos, não só o último). `access-handler.decidirAcesso` checa a
+  coleção `Personal` **ANTES** do `CatracaAluno` (a coleção é a fonte
+  autoritativa; o `CatracaAluno` do enrollid pode estar com nome/status errado
+  pela colisão). Decisão sempre local. Ver `personal.ts`.
+- `personal-sync.ts` espelha `Personal` → `CatracaAluno` (nome certo, tipo
+  "personal", ativo pela validade) só pra o NOME/status aparecerem certos nas
+  telas — roda automático a cada ciclo (barato, leitura local, sem chamar EVO).
+  `syncAtivos` **exclui** tipo "personal" (senão sincronizaria contra
+  member/employee e daria status errado). `buscarNomeEStatusPorIdMember` checa
+  `Personal` primeiro (senão a descoberta pelo device reverte pro nome errado).
+- Motivo de negação: `personal_vencido`. personType 4 (EVO entryAuthorize).
+
 ## Colaboradores vs alunos (colisão de id)
 
 - A catraca facial também é usada por **colaboradores** (professores,

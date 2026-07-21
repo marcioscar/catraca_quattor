@@ -5,6 +5,7 @@
  * autorização de pagamento, que são específicos do fluxo de cancelamento).
  */
 import { getColaboradorConhecido } from "./colaboradores-conhecidos.js";
+import { getPersonalPorEnrollid } from "./personal.js";
 
 const DEFAULT_BASE_URL = "https://evo-integracao-api.w12app.com.br";
 const MEMBER_MEMBERSHIP_PATH = "/api/v3/membermembership";
@@ -255,7 +256,7 @@ export interface AlunoEvoNomeStatus {
   idMember: number;
   nome: string | null;
   ativo: boolean;
-  tipo: "aluno" | "colaborador";
+  tipo: "aluno" | "colaborador" | "personal";
 }
 
 /**
@@ -286,6 +287,15 @@ function pareceAnonimizado(nome: string | null | undefined): boolean {
 }
 
 export async function buscarNomeEStatusPorIdMember(idMember: number): Promise<AlunoEvoNomeStatus | null> {
+  // Personal vence tudo — o enrollid dele (Carteirinha) colide com
+  // member/employee de outra pessoa, e a coleção `Personal` é a fonte certa
+  // (ver personal.ts / NOTES.md). Sem isso, a descoberta pelo device
+  // reverteria o cadastro pro nome errado (ex.: 119 viraria "Maiara").
+  const personal = await getPersonalPorEnrollid(idMember);
+  if (personal) {
+    return { idMember, nome: personal.nome, ativo: personal.valido, tipo: "personal" };
+  }
+
   const colaboradorConhecido = getColaboradorConhecido(idMember);
   if (colaboradorConhecido) {
     return {

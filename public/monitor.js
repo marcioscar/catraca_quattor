@@ -19,6 +19,7 @@ const ROTULOS = {
   nao_cadastrado: "Não cadastrado — negado",
   fora_do_horario: "Fora do horário do plano — negado",
   saldo_devedor: "Saldo devedor — negado",
+  personal_vencido: "Personal — contrato vencido — negado",
 };
 
 const MOTIVOS_WELLHUB = new Set(["wellhub_ok", "wellhub_provisorio"]);

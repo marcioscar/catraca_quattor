@@ -3,12 +3,13 @@ import { autorizarEntradaEvo, PERSON_TYPE_CLIENTE, PERSON_TYPE_COLABORADOR } fro
 import { validarCheckInWellhub, wellhubConfigurado } from "./wellhub-access-control.js";
 import { classificarAlunoPorPlanosAtivos } from "./evo-plano-classificacao.js";
 import { dentroDoHorarioHoraCerta, dentroDoHorarioTurma, type TurmaHorario } from "./horario-restricao.js";
+import { getPersonalPorEnrollid, PERSON_TYPE_PERSONAL } from "./personal.js";
 import type { SendLogMessage, SendLogRecord } from "./protocol.js";
 
 export interface AccessDecision {
   enrollid: number;
   access: boolean;
-  motivo: "ok" | "plano_inativo" | "nao_cadastrado" | "wellhub_provisorio" | "wellhub_ok" | "fora_do_horario" | "saldo_devedor";
+  motivo: "ok" | "plano_inativo" | "nao_cadastrado" | "wellhub_provisorio" | "wellhub_ok" | "fora_do_horario" | "saldo_devedor" | "personal_vencido";
   /** Só presente quando access=true — gravado no log pra sincronizar com a EVO depois (ver NOTES.md). */
   personType?: number;
 }
@@ -60,6 +61,21 @@ export function isHistorico(record: SendLogRecord): boolean {
  * atalho para de valer e passa a validar o check-in de verdade.
  */
 async function decidirAcesso(enrollid: number): Promise<AccessDecision> {
+  // Personal trainer é decidido ANTES do CatracaAluno: o enrollid dele
+  // (Carteirinha/`evoPersonalId`) colide com member/employee de outra pessoa,
+  // então o registro em CatracaAluno pode estar com o nome/status errado (ex.:
+  // enrollid 119 = personal Italo, mas CatracaAluno 119 foi enriquecido como
+  // "Maiara", employee inativa). A coleção `Personal` é a fonte autoritativa.
+  const personal = await getPersonalPorEnrollid(enrollid);
+  if (personal) {
+    return {
+      enrollid,
+      access: personal.valido,
+      motivo: personal.valido ? "ok" : "personal_vencido",
+      personType: PERSON_TYPE_PERSONAL,
+    };
+  }
+
   const aluno = await db.catracaAluno.findUnique({ where: { idMember: enrollid } });
 
   if (!aluno) {
