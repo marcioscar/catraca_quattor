@@ -286,12 +286,12 @@ confirmado observando tráfego real:
   (`wellhub-checkins.ts`) antes de chamar a Wellhub de novo — se teve uma
   passagem `wellhub_ok`/`wellhub_manual`/`wellhub_auto` nos últimos 40min,
   libera direto sem tentar validar.
-- **Validação automática após 20min sem passar na catraca**: se o aluno fez
+- **Validação automática após 15min sem passar na catraca**: se o aluno fez
   check-in no app mas não passou fisicamente na catraca, o check-in ficava
   "em aberto" pro sempre do lado da Wellhub. A pedido do dono da academia
   (ciente do trade-off — reporta o check-in como usado sem confirmação
   física), `autoValidarCheckinsPendentes()` roda no job periódico
-  (`evo-sync-job.ts`, ciclo de 10min → disparo real entre 20-30min) e chama
+  (`evo-sync-job.ts`, ciclo de 10min → disparo real entre 15-25min) e chama
   `/validate` mesmo assim, registrando `wellhub_auto` no log. Continua
   tentando a cada ciclo até validar (custo baixo, poucos check-ins/dia — sem
   necessidade de guardar estado de tentativa).
