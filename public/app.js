@@ -89,6 +89,7 @@ async function carregarAcessos() {
     plano_inativo: "Plano inativo",
     nao_cadastrado: "Não cadastrado",
     fora_do_horario: "Fora do horário do plano",
+    turma_sem_matricula: "Liberado — turma sem matrícula na EVO",
     saldo_devedor: "Saldo devedor",
     personal_vencido: "Personal — contrato vencido",
     wellhub_manual: "Wellhub (validado manual)",

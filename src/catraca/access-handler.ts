@@ -18,27 +18,39 @@ export interface AccessDecision {
     | "wellhub_ok"
     | "fora_do_horario"
     | "saldo_devedor"
-    | "personal_vencido";
+    | "personal_vencido"
+    | "turma_sem_matricula";
   /** Só presente quando access=true — gravado no log pra sincronizar com a EVO depois (ver NOTES.md). */
   personType?: number;
 }
+
+type ResultadoHorario = "liberado" | "fora_do_horario" | "turma_sem_matricula";
 
 /**
  * Checa restrição de horário (Hora Certa / turma) — só pra "aluno", nunca
  * pra colaborador. Sempre local (classificação via `EvoPlano` já
  * sincronizado + cálculo de data), nunca chama a EVO nesse caminho. Ver
  * horario-restricao.ts e evo-plano-classificacao.ts.
+ *
+ * Classificado "turma" mas SEM nenhuma matrícula de turma sincronizada
+ * (`turmaHorarios` vazio) é um caso à parte: não é "fora do horário", é
+ * ausência de cadastro na EVO (aluno tem o plano mas ninguém marcou o
+ * horário de aula dele) — decisão do dono da academia (2026-07-21): libera
+ * em vez de travar por um problema de cadastro que não é culpa do aluno.
  */
-async function liberadoPorHorario(aluno: { idMembershipsAtivos: number[]; turmaHorarios: unknown }): Promise<boolean> {
+async function checarHorario(aluno: { idMembershipsAtivos: number[]; turmaHorarios: unknown }): Promise<ResultadoHorario> {
   const classificacao = await classificarAlunoPorPlanosAtivos(aluno.idMembershipsAtivos);
   if (classificacao === "livre") {
-    return true;
+    return "liberado";
   }
   if (classificacao === "horaCerta") {
-    return dentroDoHorarioHoraCerta(new Date());
+    return dentroDoHorarioHoraCerta(new Date()) ? "liberado" : "fora_do_horario";
   }
   const turmas = Array.isArray(aluno.turmaHorarios) ? (aluno.turmaHorarios as TurmaHorario[]) : [];
-  return dentroDoHorarioTurma(new Date(), turmas);
+  if (turmas.length === 0) {
+    return "turma_sem_matricula";
+  }
+  return dentroDoHorarioTurma(new Date(), turmas) ? "liberado" : "fora_do_horario";
 }
 
 /** Registros mais antigos que isso são backlog acumulado (reader ficou
@@ -100,8 +112,14 @@ async function decidirAcesso(enrollid: number): Promise<AccessDecision> {
     if (aluno.tipo === "aluno" && aluno.comDebito) {
       return { enrollid, access: false, motivo: "saldo_devedor", personType };
     }
-    if (aluno.tipo === "aluno" && !(await liberadoPorHorario(aluno))) {
-      return { enrollid, access: false, motivo: "fora_do_horario", personType };
+    if (aluno.tipo === "aluno") {
+      const resultadoHorario = await checarHorario(aluno);
+      if (resultadoHorario === "fora_do_horario") {
+        return { enrollid, access: false, motivo: "fora_do_horario", personType };
+      }
+      if (resultadoHorario === "turma_sem_matricula") {
+        return { enrollid, access: true, motivo: "turma_sem_matricula", personType };
+      }
     }
     return { enrollid, access: true, motivo: "ok", personType };
   }

@@ -19,6 +19,7 @@ const ROTULOS = {
   plano_inativo: "Plano inativo — negado",
   nao_cadastrado: "Não cadastrado — negado",
   fora_do_horario: "Fora do horário do plano — negado",
+  turma_sem_matricula: "Acesso liberado — turma sem matrícula na EVO",
   saldo_devedor: "Saldo devedor — negado",
   personal_vencido: "Personal — contrato vencido — negado",
 };

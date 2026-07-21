@@ -365,6 +365,18 @@ horário específicas — dois mecanismos diferentes na EVO:
   restrito. Classificação por nome do plano contra o catálogo local
   (`EvoPlano`), confirmada com o dono da academia contra os 244 planos
   ativos reais.
+- **Turma classificada mas SEM matrícula nenhuma** (2026-07-21, caso real:
+  Antonio Carlos Correa, idMember 20665, plano "PILATES STUDIO 2X ANUAL",
+  sempre negado às 15:51): `turmaHorarios` vazio faz `dentroDoHorarioTurma`
+  nunca achar janela — sem essa checagem, bloqueia pra sempre até alguém
+  cadastrar a matrícula de turma na EVO (confirmado ao vivo: `GET
+  /api/v2/activities/enroll/member?idMember=X&status=1` retorna `[]` mesmo,
+  não é sync desatualizado — o dado não existe do lado da EVO). Achamos mais
+  7 alunos no mesmo caso (325 classificados "turma" no total, 8 com matrícula
+  zerada). **Decisão do dono**: libera nesse caso (`motivo:
+  "turma_sem_matricula"`) em vez de travar por um problema de cadastro que
+  não é culpa do aluno — resolve o caso individual quando a turma for
+  cadastrada na EVO (aí `dentroDoHorarioTurma` passa a valer normalmente).
 - **Arquitetura**: a decisão em `access-handler.ts` continua 100% local
   (nunca chama a EVO na hora da passagem) — dois jobs sincronizam
   periodicamente (mas **não automaticamente ainda**, ver abaixo) os dados
