@@ -6,6 +6,7 @@ import { catracaRoutes } from "./catraca/routes.js";
 import { startCatracaWsServer } from "./catraca/ws-server.js";
 import { startEvoSyncJob, startWellhubAutoValidacaoJob } from "./catraca/evo-sync-job.js";
 import { startEvoClientesSyncJob } from "./catraca/evo-clientes-sync.js";
+import { startWellhubIdsSyncJob } from "./catraca/wellhub-ids-sync.js";
 import { carregarCacheInicial } from "./catraca/known-aluno-cache.js";
 
 // Sync de restrição de horário (Hora Certa/turma) NÃO inicia automaticamente
@@ -40,6 +41,14 @@ const start = async () => {
     startCatracaWsServer(CATRACA_WS_PORT);
     startEvoSyncJob(EVO_SYNC_INTERVAL_MS);
     startWellhubAutoValidacaoJob();
+    // wellhub-ids-sync (30min, barato) só enxerga check-ins que passaram
+    // pelo sistema da própria EVO — quem valida direto com a Wellhub (nosso
+    // caminho mais comum, ver wellhub-access-control.ts) fica invisível pra
+    // esse relatório (confirmado em 2026-07-21: gympassId certo no perfil,
+    // mas ausente no relatório de check-ins). Por isso continua sendo só um
+    // complemento rápido — o full-crawl diário (evo-clientes-sync.ts) segue
+    // sendo a única fonte completa e continua na cadência original.
+    startWellhubIdsSyncJob();
     startEvoClientesSyncJob();
   } catch (err) {
     app.log.error(err);

@@ -275,7 +275,24 @@ confirmado observando tráfego real:
      nunca tinha sido resincronizada). **Agora roda sozinho 1x/dia**
      (`startEvoClientesSyncJob`, chamado no `index.ts`) — é uma varredura em
      lote (~444 páginas), bem mais barata que os syncs de horário
-     (600-1500 chamadas cada, esses sim mantidos manuais, ver abaixo).
+     (600-1500 chamadas cada, esses sim mantidos manuais, ver abaixo). Medido
+     ao vivo em 2026-07-21: ~85min pra varrer os 22 mil clientes, 0 erros.
+   - **Tentativa de troca por algo mais rápido, parcialmente aproveitada**
+     (2026-07-21): existe `GET /api/v1/management/aggregators/checkins/search`
+     (`Aggregators=1` = Wellhub) que devolve `idMember`+`tokenUsed` direto,
+     filtrado por período — poucas dezenas de linhas/dia em vez de 22 mil
+     clientes, uns 4s em vez de 85min. **Mas é incompleto**: só reflete
+     check-ins que passaram pelo sistema da própria EVO (ex.: `entryAuthorize`
+     validando Wellhub no backend dela quando o `ativo` é true, caso da Ianê).
+     Quem é validado **direto por nós** (`wellhub-access-control.ts`,
+     bypassando a EVO — nosso caminho mais comum, é literalmente por isso que
+     construímos a integração direta) fica invisível nesse relatório —
+     confirmado com a Ludmila (idMember 24430): `gympassId` certo no perfil
+     dela (`GET /api/v2/members`), mas ausente no relatório de check-ins.
+     **Decisão**: mantido como complemento rápido (`wellhub-ids-sync.ts`,
+     roda a cada 30min) só pra pegar mais cedo os casos que ele consegue ver
+     — o full-crawl diário continua sendo a única fonte completa, não foi
+     substituído.
 
 ### Reentrada e validação automática (2026-07-21)
 
