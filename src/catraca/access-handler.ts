@@ -1,6 +1,7 @@
 import { db } from "../db.js";
 import { autorizarEntradaEvo, PERSON_TYPE_CLIENTE, PERSON_TYPE_COLABORADOR } from "./evo-access-control.js";
 import { validarCheckInWellhub, wellhubConfigurado } from "./wellhub-access-control.js";
+import { passagemWellhubRecente } from "./wellhub-checkins.js";
 import { classificarAlunoPorPlanosAtivos } from "./evo-plano-classificacao.js";
 import { dentroDoHorarioHoraCerta, dentroDoHorarioTurma, type TurmaHorario } from "./horario-restricao.js";
 import { getPersonalPorEnrollid, PERSON_TYPE_PERSONAL } from "./personal.js";
@@ -9,7 +10,15 @@ import type { SendLogMessage, SendLogRecord } from "./protocol.js";
 export interface AccessDecision {
   enrollid: number;
   access: boolean;
-  motivo: "ok" | "plano_inativo" | "nao_cadastrado" | "wellhub_provisorio" | "wellhub_ok" | "fora_do_horario" | "saldo_devedor" | "personal_vencido";
+  motivo:
+    | "ok"
+    | "plano_inativo"
+    | "nao_cadastrado"
+    | "wellhub_provisorio"
+    | "wellhub_ok"
+    | "fora_do_horario"
+    | "saldo_devedor"
+    | "personal_vencido";
   /** Só presente quando access=true — gravado no log pra sincronizar com a EVO depois (ver NOTES.md). */
   personType?: number;
 }
@@ -100,6 +109,12 @@ async function decidirAcesso(enrollid: number): Promise<AccessDecision> {
   if (aluno.wellhubId) {
     if (!wellhubConfigurado()) {
       return { enrollid, access: true, motivo: "wellhub_provisorio", personType };
+    }
+    // Reentrada recente (ex.: foi no carro pegar algo e voltou) — o check-in
+    // já foi validado, uma segunda tentativa de /validate falharia mesmo com
+    // a pessoa presente. Libera sem chamar a Wellhub de novo.
+    if (await passagemWellhubRecente(enrollid)) {
+      return { enrollid, access: true, motivo: "wellhub_ok", personType };
     }
     const autorizacaoWellhub = await validarCheckInWellhub(aluno.wellhubId);
     if (autorizacaoWellhub?.autorizado) {

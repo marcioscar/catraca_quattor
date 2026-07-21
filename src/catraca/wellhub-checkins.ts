@@ -4,8 +4,24 @@ import { validarCheckInWellhub } from "./wellhub-access-control.js";
 /** Check-in é validável (dá pra confirmar) por 30 min depois de criado. */
 const JANELA_VALIDACAO_MS = 30 * 60 * 1000;
 
+/**
+ * Depois desse tempo sem passagem na catraca, valida automaticamente o
+ * check-in mesmo assim (pra não ficar em aberto pro sempre do lado da
+ * Wellhub — pedido do dono da academia). Roda no job periódico
+ * (evo-sync-job.ts), então o disparo real fica entre 25 e ~35min.
+ */
+const JANELA_AUTO_VALIDACAO_MS = 25 * 60 * 1000;
+
+/**
+ * Depois de uma passagem validada pela Wellhub, libera reentrada na catraca
+ * por esse tempo sem tentar validar de novo — o check-in é de uso único, uma
+ * segunda chamada a /validate falharia mesmo com a pessoa presente (ex.: foi
+ * no vestiário e voltou). Ver `passagemWellhubRecente`.
+ */
+const JANELA_REENTRADA_MS = 40 * 60 * 1000;
+
 /** Motivos de acesso que contam como "entrou pela Wellhub" (validado). */
-const MOTIVOS_WELLHUB_VALIDADO = ["wellhub_ok", "wellhub_provisorio", "wellhub_manual"];
+const MOTIVOS_WELLHUB_VALIDADO = ["wellhub_ok", "wellhub_provisorio", "wellhub_manual", "wellhub_auto"];
 
 export interface CheckinListado {
   gympassId: string;
@@ -104,4 +120,50 @@ export async function validarCheckinManual(gympassId: string): Promise<Resultado
   });
 
   return { ok: true, mensagem: "Check-in validado." };
+}
+
+/**
+ * True se esse idMember teve uma passagem Wellhub validada nos últimos
+ * `JANELA_REENTRADA_MS` — usado por `access-handler.ts` pra liberar
+ * reentrada (ex.: foi no carro pegar algo e voltou) sem tentar validar o
+ * check-in de novo, já que é de uso único e a segunda tentativa falharia.
+ */
+export async function passagemWellhubRecente(idMember: number): Promise<boolean> {
+  const desde = new Date(Date.now() - JANELA_REENTRADA_MS);
+  const passagem = await db.catracaAcessoLog.findFirst({
+    where: { idMember, permitido: true, motivo: { in: MOTIVOS_WELLHUB_VALIDADO }, ocorridoEm: { gte: desde } },
+    select: { id: true },
+  });
+  return passagem !== null;
+}
+
+/**
+ * Valida automaticamente check-ins de hoje que passaram de
+ * `JANELA_AUTO_VALIDACAO_MS` sem a pessoa ter passado na catraca — pra não
+ * ficar em aberto pro sempre do lado da Wellhub (pedido explícito do dono da
+ * academia, mesmo sabendo que isso reporta o check-in como usado sem
+ * confirmação física). Continua tentando a cada ciclo do job enquanto não
+ * validar (custo baixo, poucos check-ins/dia) — se um dia tiver volume alto,
+ * vale guardar estado de "já tentei e falhou" pra não bater na API à toa.
+ */
+export async function autoValidarCheckinsPendentes(): Promise<void> {
+  const pendentes = (await listarCheckinsDoDia()).filter(
+    (c) => !c.validado && Date.now() - c.recebidoEm.getTime() >= JANELA_AUTO_VALIDACAO_MS
+  );
+
+  for (const checkin of pendentes) {
+    const resultado = await validarCheckInWellhub(checkin.gympassId);
+    if (!resultado?.autorizado) {
+      continue;
+    }
+    await db.catracaAcessoLog.create({
+      data: {
+        idMember: checkin.idMember ?? 0,
+        nome: checkin.nome,
+        permitido: true,
+        motivo: "wellhub_auto",
+        personType: 1,
+      },
+    });
+  }
 }

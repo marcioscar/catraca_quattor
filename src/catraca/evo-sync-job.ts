@@ -2,6 +2,7 @@ import { db } from "../db.js";
 import { fetchIdEmployeesAtivos, fetchIdMembersAtivos } from "./evo-active-members.js";
 import { sincronizarDebitosEvo } from "./evo-debito-sync.js";
 import { sincronizarPersonais } from "./personal-sync.js";
+import { autoValidarCheckinsPendentes } from "./wellhub-checkins.js";
 import { NAO_REMOVIDO } from "./filtros.js";
 
 const DEFAULT_INTERVAL_MS = 10 * 60 * 1000;
@@ -57,6 +58,7 @@ function rodarSyncs(): void {
   syncAtivos().catch((error) => console.error("[catraca] erro no sync de ativos:", error));
   sincronizarDebitosEvo().catch((error) => console.error("[catraca] erro no sync de débitos:", error));
   sincronizarPersonais().catch((error) => console.error("[catraca] erro no sync de personais:", error));
+  autoValidarCheckinsPendentes().catch((error) => console.error("[catraca] erro na auto-validação Wellhub:", error));
 }
 
 export function startEvoSyncJob(intervalMs = DEFAULT_INTERVAL_MS): void {

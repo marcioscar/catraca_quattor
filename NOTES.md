@@ -271,6 +271,33 @@ confirmado observando tráfego real:
      atualizar de novo no futuro: pedir novo export do mesmo relatório na
      EVO e rerodar.
 
+### Reentrada e validação automática (2026-07-21)
+
+- **Reentrada dentro de 40min não revalida**: o check-in Wellhub é de uso
+  único — depois do primeiro `/validate` bem-sucedido, uma segunda chamada
+  falharia mesmo com a pessoa presente (ex.: foi no carro pegar algo e
+  voltou). `decidirAcesso` agora checa `passagemWellhubRecente(enrollid)`
+  (`wellhub-checkins.ts`) antes de chamar a Wellhub de novo — se teve uma
+  passagem `wellhub_ok`/`wellhub_manual`/`wellhub_auto` nos últimos 40min,
+  libera direto sem tentar validar.
+- **Validação automática após 25min sem passar na catraca**: se o aluno fez
+  check-in no app mas não passou fisicamente na catraca, o check-in ficava
+  "em aberto" pro sempre do lado da Wellhub. A pedido do dono da academia
+  (ciente do trade-off — reporta o check-in como usado sem confirmação
+  física), `autoValidarCheckinsPendentes()` roda no job periódico
+  (`evo-sync-job.ts`, ciclo de 10min → disparo real entre 25-35min) e chama
+  `/validate` mesmo assim, registrando `wellhub_auto` no log. Continua
+  tentando a cada ciclo até validar (custo baixo, poucos check-ins/dia — sem
+  necessidade de guardar estado de tentativa).
+  - `wellhub_auto` é **excluído** de `/catraca/acessos/ultimo` (rota do
+    monitor ao vivo) — é uma confirmação tardia via job em background, não
+    uma passagem física na hora; mostrar isso como "acesso ao vivo" enganaria
+    quem está olhando a tela. Aparece normalmente no histórico
+    (`/catraca/acessos`) e na tela `/wellhub.html` como validado.
+  - Validação manual (`validarCheckinManual`, botão na tela `/wellhub.html`)
+    continua existindo como fallback pra quando a auto falha (ex.: erro
+    transitório na API da Wellhub).
+
 ## Migração do MongoDB: Atlas → EasyPanel (self-hosted)
 
 - Em 2026-07-09 o banco saiu do Atlas (`cluster0.lg36a.mongodb.net`) pra um

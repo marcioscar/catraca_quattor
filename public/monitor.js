@@ -15,6 +15,7 @@ const ROTULOS = {
   wellhub_ok: "Acesso liberado — Wellhub",
   wellhub_provisorio: "Acesso liberado — Wellhub (provisório)",
   wellhub_manual: "Acesso liberado — Wellhub (manual)",
+  wellhub_auto: "Acesso liberado — Wellhub (automático)",
   plano_inativo: "Plano inativo — negado",
   nao_cadastrado: "Não cadastrado — negado",
   fora_do_horario: "Fora do horário do plano — negado",
@@ -22,7 +23,7 @@ const ROTULOS = {
   personal_vencido: "Personal — contrato vencido — negado",
 };
 
-const MOTIVOS_WELLHUB = new Set(["wellhub_ok", "wellhub_provisorio"]);
+const MOTIVOS_WELLHUB = new Set(["wellhub_ok", "wellhub_provisorio", "wellhub_manual", "wellhub_auto"]);
 
 const TEMPO_DETALHE_MS = 30000;
 const QTD_GRADE = 42;

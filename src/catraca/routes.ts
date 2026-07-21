@@ -257,8 +257,12 @@ export async function catracaRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // Último acesso + dados do aluno (foto, status), para o monitor ao vivo da recepção.
+  // Exclui "wellhub_auto": é uma confirmação tardia (job em background, não
+  // uma passagem física na hora) — mostrar isso como "acesso ao vivo" no
+  // monitor enganaria quem está vendo a tela (ver NOTES.md).
   app.get("/catraca/acessos/ultimo", async () => {
     const ultimo = await db.catracaAcessoLog.findFirst({
+      where: { motivo: { not: "wellhub_auto" } },
       orderBy: { ocorridoEm: "desc" },
     });
     if (!ultimo) {

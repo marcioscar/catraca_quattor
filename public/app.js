@@ -92,6 +92,7 @@ async function carregarAcessos() {
     saldo_devedor: "Saldo devedor",
     personal_vencido: "Personal — contrato vencido",
     wellhub_manual: "Wellhub (validado manual)",
+    wellhub_auto: "Wellhub (validado automático)",
   };
   const soNegados = filtroAcessosSelecionado() === "negados";
   const lista = soNegados ? acessos.filter((a) => !a.permitido) : acessos;
