@@ -256,20 +256,26 @@ confirmado observando tráfego real:
   1. ~~**Credenciais**~~ — recebidas e configuradas em produção (2026-07-20,
      ver acima). Token de produção veio do Tech Sales da Wellhub (Marco Ende)
      via onetimesecret.
-  2. **Origem do `gympass_id` por aluno** — **resolvido, dá pra fazer em
-     lote**: a EVO tem um **relatório de check-ins Wellhub** exportável em
-     CSV (colunas `ID` = idMember, `ID Agregador` = gympass_id, entre
-     outras) — não achamos endpoint de API pra isso (`GET /api/v2/members/
-     {idMember}` não retorna esse campo, testado contra idMember 18684),
-     mas o relatório exportado manualmente do painel resolve. Processado em
-     2026-07-09: 6089 linhas de check-in → 448 `idMember` únicos → 436
-     batidos com alunos já cadastrados no `CatracaAluno` (12 não encontrados
-     ainda, provavelmente não descobertos via `sendlog`). 2 conflitos (aluno
-     com dois gympass_id diferentes ao longo do histórico — resolvido pelo
-     mais frequente). Script reaproveitável em `scripts/import-wellhub-csv.ts`
-     (`npx tsx scripts/import-wellhub-csv.ts /caminho/wellhub.csv`). Pra
-     atualizar de novo no futuro: pedir novo export do mesmo relatório na
-     EVO e rerodar.
+  2. **Origem do `gympass_id` por aluno** — **resolvido, e melhor do que
+     imaginávamos no começo**: achávamos que só dava pra descobrir via
+     relatório de check-ins exportado manualmente do painel da EVO (é o que
+     esse item dizia antes — desatualizado, `scripts/import-wellhub-csv.ts`
+     ficou como peça morta). Na real: `GET /api/v2/members/{idMember}` (busca
+     individual) não retorna `gympassId`, mas a **lista paginada** `GET
+     /api/v2/members` retorna sim (ver `evo-clientes-sync.ts`). Ou seja, dá
+     pra descobrir e manter atualizado só com a API, sem exportar nada na mão.
+   - Primeira rodada em massa em 2026-07-09 (via `POST
+     /catraca/sincronizar-clientes`, que sincroniza a coleção `EvoCliente`
+     inteira e já backfilla `CatracaAluno.wellhubId` de quem tiver
+     `gympassId`): ~1500 vínculos de uma vez.
+   - **Descoberto em 2026-07-21**: essa sincronização só rodava manualmente,
+     então quem vinculou o Wellhub depois de 09/07 ficava sem `wellhubId` até
+     alguém rodar de novo na mão (caso real: Ianê de Andrade Azevedo, idMember
+     23612, apareceu como "não cadastrado" na tela `/wellhub.html` porque
+     nunca tinha sido resincronizada). **Agora roda sozinho 1x/dia**
+     (`startEvoClientesSyncJob`, chamado no `index.ts`) — é uma varredura em
+     lote (~444 páginas), bem mais barata que os syncs de horário
+     (600-1500 chamadas cada, esses sim mantidos manuais, ver abaixo).
 
 ### Reentrada e validação automática (2026-07-21)
 

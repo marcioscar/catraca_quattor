@@ -294,3 +294,25 @@ export async function sincronizarClientesEvo(skipInicial = 0): Promise<void> {
     progresso.rodando = false;
   }
 }
+
+const INTERVALO_SYNC_CLIENTES_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Roda `sincronizarClientesEvo` sozinho 1x por dia — é o único jeito
+ * automático de manter `CatracaAluno.wellhubId` em dia (backfill via
+ * `gympassId`, ver comentário no topo do arquivo), sem isso alunos que
+ * vincularam o Wellhub depois da última sincronização manual aparecem como
+ * "não cadastrado" na tela de check-ins até alguém notar e rodar na mão.
+ *
+ * Cadência diária (não a cada 10min como os outros syncs) porque é uma
+ * varredura completa da base de clientes (~444 páginas) — mais pesado que os
+ * outros jobs automáticos, mas ainda uma fração do custo dos syncs de
+ * horário (600-1500 chamadas cada, esses sim mantidos manuais por incerteza
+ * sobre o limite diário da chave da EVO, ver NOTES.md).
+ */
+export function startEvoClientesSyncJob(intervalMs = INTERVALO_SYNC_CLIENTES_MS): void {
+  sincronizarClientesEvo().catch((error) => console.error("[catraca] erro na sincronização de clientes:", error));
+  setInterval(() => {
+    sincronizarClientesEvo().catch((error) => console.error("[catraca] erro na sincronização de clientes:", error));
+  }, intervalMs);
+}

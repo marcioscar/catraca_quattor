@@ -5,6 +5,7 @@ import { db } from "./db.js";
 import { catracaRoutes } from "./catraca/routes.js";
 import { startCatracaWsServer } from "./catraca/ws-server.js";
 import { startEvoSyncJob } from "./catraca/evo-sync-job.js";
+import { startEvoClientesSyncJob } from "./catraca/evo-clientes-sync.js";
 import { carregarCacheInicial } from "./catraca/known-aluno-cache.js";
 
 // Sync de restrição de horário (Hora Certa/turma) NÃO inicia automaticamente
@@ -38,6 +39,7 @@ const start = async () => {
     await carregarCacheInicial();
     startCatracaWsServer(CATRACA_WS_PORT);
     startEvoSyncJob(EVO_SYNC_INTERVAL_MS);
+    startEvoClientesSyncJob();
   } catch (err) {
     app.log.error(err);
     process.exit(1);
