@@ -8,9 +8,9 @@ const JANELA_VALIDACAO_MS = 30 * 60 * 1000;
  * Depois desse tempo sem passagem na catraca, valida automaticamente o
  * check-in mesmo assim (pra não ficar em aberto pro sempre do lado da
  * Wellhub — pedido do dono da academia). Roda no job periódico
- * (evo-sync-job.ts), então o disparo real fica entre 25 e ~35min.
+ * (evo-sync-job.ts), então o disparo real fica entre 20 e ~30min.
  */
-const JANELA_AUTO_VALIDACAO_MS = 25 * 60 * 1000;
+const JANELA_AUTO_VALIDACAO_MS = 20 * 60 * 1000;
 
 /**
  * Depois de uma passagem validada pela Wellhub, libera reentrada na catraca
