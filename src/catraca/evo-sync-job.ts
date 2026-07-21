@@ -58,10 +58,26 @@ function rodarSyncs(): void {
   syncAtivos().catch((error) => console.error("[catraca] erro no sync de ativos:", error));
   sincronizarDebitosEvo().catch((error) => console.error("[catraca] erro no sync de débitos:", error));
   sincronizarPersonais().catch((error) => console.error("[catraca] erro no sync de personais:", error));
-  autoValidarCheckinsPendentes().catch((error) => console.error("[catraca] erro na auto-validação Wellhub:", error));
 }
 
 export function startEvoSyncJob(intervalMs = DEFAULT_INTERVAL_MS): void {
   rodarSyncs();
   setInterval(rodarSyncs, intervalMs);
+}
+
+/**
+ * Auto-validação Wellhub roda separada, num ciclo mais curto que o resto dos
+ * syncs — descoberto em 2026-07-21 que a própria Wellhub cancela check-ins
+ * não usados num prazo que pode ser mais curto que 25min (caso real: Aline
+ * Gomes Suares Lima, check-in cancelado pela Wellhub antes da nossa
+ * tentativa chegar, no ciclo de 10min old). Ciclo de 5min reduz essa janela
+ * de perda pela metade.
+ */
+const AUTO_VALIDACAO_INTERVAL_MS = 5 * 60 * 1000;
+
+export function startWellhubAutoValidacaoJob(intervalMs = AUTO_VALIDACAO_INTERVAL_MS): void {
+  const rodar = () =>
+    autoValidarCheckinsPendentes().catch((error) => console.error("[catraca] erro na auto-validação Wellhub:", error));
+  rodar();
+  setInterval(rodar, intervalMs);
 }

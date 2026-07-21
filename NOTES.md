@@ -290,11 +290,12 @@ confirmado observando tráfego real:
   check-in no app mas não passou fisicamente na catraca, o check-in ficava
   "em aberto" pro sempre do lado da Wellhub. A pedido do dono da academia
   (ciente do trade-off — reporta o check-in como usado sem confirmação
-  física), `autoValidarCheckinsPendentes()` roda no job periódico
-  (`evo-sync-job.ts`, ciclo de 10min → disparo real entre 15-25min) e chama
-  `/validate` mesmo assim, registrando `wellhub_auto` no log. Continua
-  tentando a cada ciclo até validar (custo baixo, poucos check-ins/dia — sem
-  necessidade de guardar estado de tentativa).
+  física), `autoValidarCheckinsPendentes()` chama `/validate` mesmo assim,
+  registrando `wellhub_auto` no log. Roda no próprio job
+  (`startWellhubAutoValidacaoJob`, `evo-sync-job.ts`), ciclo de **5min**
+  (separado do resto dos syncs, que é 10min) → disparo real entre 15-20min.
+  Continua tentando a cada ciclo até validar (custo baixo, poucos
+  check-ins/dia — sem necessidade de guardar estado de tentativa).
   - `wellhub_auto` é **excluído** de `/catraca/acessos/ultimo` (rota do
     monitor ao vivo) — é uma confirmação tardia via job em background, não
     uma passagem física na hora; mostrar isso como "acesso ao vivo" enganaria
@@ -303,6 +304,17 @@ confirmado observando tráfego real:
   - Validação manual (`validarCheckinManual`, botão na tela `/wellhub.html`)
     continua existindo como fallback pra quando a auto falha (ex.: erro
     transitório na API da Wellhub).
+  - **Investigado ao vivo em 2026-07-21** (produção mostrava 0 `wellhub_auto`
+    apesar de check-ins de horas atrás): na maioria dos casos não é bug —
+    testar `/validate` direto contra a API real da Wellhub pra check-ins
+    "pendentes" no nosso sistema devolveu `"Check-In already validated"` na
+    maioria: **a própria EVO já validou o check-in no backend dela** quando
+    o aluno passou fisicamente (via `autorizarEntradaEvo`), mesmo sem
+    `wellhubId` vinculado no nosso cadastro na hora — então o motivo ficou
+    `ok` em vez de `wellhub_ok`, mas o check-in já tinha sido resolvido de
+    verdade. Achado 1 caso real de perda (Aline Gomes Suares Lima — a
+    Wellhub cancelou o check-in dela sozinha antes da nossa tentativa
+    chegar, no ciclo antigo de 10min/25min) — daí o ciclo dedicado de 5min.
 
 ## Migração do MongoDB: Atlas → EasyPanel (self-hosted)
 

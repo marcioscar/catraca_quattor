@@ -4,7 +4,7 @@ import fastifyStatic from "@fastify/static";
 import { db } from "./db.js";
 import { catracaRoutes } from "./catraca/routes.js";
 import { startCatracaWsServer } from "./catraca/ws-server.js";
-import { startEvoSyncJob } from "./catraca/evo-sync-job.js";
+import { startEvoSyncJob, startWellhubAutoValidacaoJob } from "./catraca/evo-sync-job.js";
 import { startEvoClientesSyncJob } from "./catraca/evo-clientes-sync.js";
 import { carregarCacheInicial } from "./catraca/known-aluno-cache.js";
 
@@ -39,6 +39,7 @@ const start = async () => {
     await carregarCacheInicial();
     startCatracaWsServer(CATRACA_WS_PORT);
     startEvoSyncJob(EVO_SYNC_INTERVAL_MS);
+    startWellhubAutoValidacaoJob();
     startEvoClientesSyncJob();
   } catch (err) {
     app.log.error(err);
