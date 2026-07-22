@@ -13,14 +13,6 @@ const JANELA_VALIDACAO_MS = 30 * 60 * 1000;
  */
 const JANELA_AUTO_VALIDACAO_MS = 15 * 60 * 1000;
 
-/**
- * Depois de uma passagem validada pela Wellhub, libera reentrada na catraca
- * por esse tempo sem tentar validar de novo — o check-in é de uso único, uma
- * segunda chamada a /validate falharia mesmo com a pessoa presente (ex.: foi
- * no vestiário e voltou). Ver `passagemWellhubRecente`.
- */
-const JANELA_REENTRADA_MS = 40 * 60 * 1000;
-
 /** Motivos de acesso que contam como "entrou pela Wellhub" (validado). */
 const MOTIVOS_WELLHUB_VALIDADO = ["wellhub_ok", "wellhub_provisorio", "wellhub_manual", "wellhub_auto"];
 
@@ -124,15 +116,18 @@ export async function validarCheckinManual(gympassId: string): Promise<Resultado
 }
 
 /**
- * True se esse idMember teve uma passagem Wellhub validada nos últimos
- * `JANELA_REENTRADA_MS` — usado por `access-handler.ts` pra liberar
- * reentrada (ex.: foi no carro pegar algo e voltou) sem tentar validar o
- * check-in de novo, já que é de uso único e a segunda tentativa falharia.
+ * True se esse idMember já teve uma passagem Wellhub validada HOJE (mesmo
+ * dia calendário, não uma janela de tempo fixa — pedido do dono da academia
+ * em 2026-07-22: check-in Wellhub libera o dia todo, não só os primeiros
+ * minutos) — usado por `access-handler.ts` pra liberar reentrada sem tentar
+ * validar o check-in de novo, já que é de uso único e a segunda tentativa
+ * sempre falharia ("already validated").
  */
 export async function passagemWellhubRecente(idMember: number): Promise<boolean> {
-  const desde = new Date(Date.now() - JANELA_REENTRADA_MS);
+  const inicioHoje = new Date();
+  inicioHoje.setHours(0, 0, 0, 0);
   const passagem = await db.catracaAcessoLog.findFirst({
-    where: { idMember, permitido: true, motivo: { in: MOTIVOS_WELLHUB_VALIDADO }, ocorridoEm: { gte: desde } },
+    where: { idMember, permitido: true, motivo: { in: MOTIVOS_WELLHUB_VALIDADO }, ocorridoEm: { gte: inicioHoje } },
     select: { id: true },
   });
   return passagem !== null;

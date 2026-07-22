@@ -296,13 +296,17 @@ confirmado observando tráfego real:
 
 ### Reentrada e validação automática (2026-07-21)
 
-- **Reentrada dentro de 40min não revalida**: o check-in Wellhub é de uso
+- **Reentrada no mesmo dia não revalida**: o check-in Wellhub é de uso
   único — depois do primeiro `/validate` bem-sucedido, uma segunda chamada
   falharia mesmo com a pessoa presente (ex.: foi no carro pegar algo e
-  voltou). `decidirAcesso` agora checa `passagemWellhubRecente(enrollid)`
+  voltou, ou volta à noite depois de ter validado de manhã).
+  `decidirAcesso` checa `passagemWellhubRecente(enrollid)`
   (`wellhub-checkins.ts`) antes de chamar a Wellhub de novo — se teve uma
-  passagem `wellhub_ok`/`wellhub_manual`/`wellhub_auto` nos últimos 40min,
-  libera direto sem tentar validar.
+  passagem `wellhub_ok`/`wellhub_manual`/`wellhub_auto` no mesmo dia
+  calendário, libera direto sem tentar validar. Era uma janela fixa de
+  40min até 2026-07-22, trocada pra "dia todo" a pedido do dono da
+  academia (mesmo critério de "mesmo dia" já usado em
+  `listarCheckinsDoDia` pra decidir "validado").
 - **Validação automática após 15min sem passar na catraca**: se o aluno fez
   check-in no app mas não passou fisicamente na catraca, o check-in ficava
   "em aberto" pro sempre do lado da Wellhub. A pedido do dono da academia

@@ -128,9 +128,10 @@ async function decidirAcesso(enrollid: number): Promise<AccessDecision> {
     if (!wellhubConfigurado()) {
       return { enrollid, access: true, motivo: "wellhub_provisorio", personType };
     }
-    // Reentrada recente (ex.: foi no carro pegar algo e voltou) — o check-in
-    // já foi validado, uma segunda tentativa de /validate falharia mesmo com
-    // a pessoa presente. Libera sem chamar a Wellhub de novo.
+    // Reentrada no mesmo dia (ex.: foi no carro pegar algo e voltou, ou volta
+    // à noite depois de já ter validado de manhã) — o check-in já foi
+    // validado, uma segunda tentativa de /validate falharia mesmo com a
+    // pessoa presente. Libera o dia todo sem chamar a Wellhub de novo.
     if (await passagemWellhubRecente(enrollid)) {
       return { enrollid, access: true, motivo: "wellhub_ok", personType };
     }
