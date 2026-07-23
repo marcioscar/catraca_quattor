@@ -336,6 +336,14 @@ confirmado observando tráfego real:
     verdade. Achado 1 caso real de perda (Aline Gomes Suares Lima — a
     Wellhub cancelou o check-in dela sozinha antes da nossa tentativa
     chegar, no ciclo antigo de 10min/25min) — daí o ciclo dedicado de 5min.
+  - **Bug de parsing do erro descoberto em 2026-07-23** (botão "Validar" em
+    `/wellhub.html` mostrava sempre "Bad Request", sem detalhe): o corpo de
+    erro real da Wellhub vem como `{"errors":[{"message":"Check-In
+    canceled",...}]}`, não `{"message": "..."}` nem `{"error": "..."}` como
+    `wellhub-access-control.ts` esperava — caía sempre no fallback genérico
+    `response.statusText` ("Bad Request" pra qualquer 400). Corrigido pra ler
+    `payload.errors[0].message` primeiro. Não documentado pela Wellhub,
+    descoberto testando `/validate` ao vivo.
 - **Motivo `wellhub_sem_checkin`** (2026-07-23): antes, aluno com `wellhubId`
   cadastrado mas que ainda não fez check-in no app caía no motivo genérico
   `plano_inativo` no monitor — confuso pra recepção, parece problema de

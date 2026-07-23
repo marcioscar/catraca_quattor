@@ -21,6 +21,9 @@ const DEFAULT_TIMEOUT_MS = 8000;
 interface ValidateErrorResponse {
   message?: string;
   error?: string;
+  // Forma real observada na API: {"errors":[{"message":"Check-In canceled","key":"..."}]}
+  // (não documentada — descoberta testando ao vivo, ver NOTES.md).
+  errors?: { message?: string }[];
 }
 
 export interface AutorizacaoWellhub {
@@ -81,7 +84,8 @@ export async function validarCheckInWellhub(wellhubId: string): Promise<Autoriza
     }
 
     const payload = (await response.json().catch(() => null)) as ValidateErrorResponse | null;
-    return { autorizado: false, mensagem: payload?.message ?? payload?.error ?? response.statusText };
+    const mensagem = payload?.errors?.[0]?.message ?? payload?.message ?? payload?.error ?? response.statusText;
+    return { autorizado: false, mensagem };
   } catch {
     return null;
   } finally {
