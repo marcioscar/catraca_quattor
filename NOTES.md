@@ -336,6 +336,12 @@ confirmado observando tráfego real:
     verdade. Achado 1 caso real de perda (Aline Gomes Suares Lima — a
     Wellhub cancelou o check-in dela sozinha antes da nossa tentativa
     chegar, no ciclo antigo de 10min/25min) — daí o ciclo dedicado de 5min.
+- **Motivo `wellhub_sem_checkin`** (2026-07-23): antes, aluno com `wellhubId`
+  cadastrado mas que ainda não fez check-in no app caía no motivo genérico
+  `plano_inativo` no monitor — confuso pra recepção, parece problema de
+  plano/pagamento quando na real é só "ainda não fez check-in". Agora
+  `decidirAcesso` distingue: se tem `wellhubId` e nem a Wellhub nem a EVO
+  autorizaram, retorna `wellhub_sem_checkin` em vez de `plano_inativo`.
 
 ## Migração do MongoDB: Atlas → EasyPanel (self-hosted)
 

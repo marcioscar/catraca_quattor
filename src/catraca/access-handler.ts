@@ -19,7 +19,8 @@ export interface AccessDecision {
     | "fora_do_horario"
     | "saldo_devedor"
     | "personal_vencido"
-    | "turma_sem_matricula";
+    | "turma_sem_matricula"
+    | "wellhub_sem_checkin";
   /** Só presente quando access=true — gravado no log pra sincronizar com a EVO depois (ver NOTES.md). */
   personType?: number;
 }
@@ -144,6 +145,14 @@ async function decidirAcesso(enrollid: number): Promise<AccessDecision> {
   const autorizacao = await autorizarEntradaEvo(enrollid, personType);
   if (autorizacao?.autorizado) {
     return { enrollid, access: true, motivo: "ok", personType };
+  }
+
+  // Tem wellhubId cadastrado mas nem a Wellhub nem a EVO autorizaram — o
+  // motivo mais provável é que ele não fez check-in no app ainda, não que o
+  // "plano" em si tenha algum problema (ele não tem plano na EVO, só Wellhub).
+  // Mensagem específica pra recepção não confundir com plano vencido/cancelado.
+  if (aluno.wellhubId) {
+    return { enrollid, access: false, motivo: "wellhub_sem_checkin" };
   }
 
   return { enrollid, access: false, motivo: "plano_inativo" };

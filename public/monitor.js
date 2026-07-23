@@ -17,6 +17,7 @@ const ROTULOS = {
   wellhub_manual: "Acesso liberado — Wellhub (manual)",
   wellhub_auto: "Acesso liberado — Wellhub (automático)",
   plano_inativo: "Plano inativo — negado",
+  wellhub_sem_checkin: "Check-in não feito — negado",
   nao_cadastrado: "Não cadastrado — negado",
   fora_do_horario: "Fora do horário do plano — negado",
   turma_sem_matricula: "Acesso liberado — turma sem matrícula na EVO",

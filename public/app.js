@@ -87,6 +87,7 @@ async function carregarAcessos() {
     wellhub_ok: "Liberado — Wellhub",
     wellhub_provisorio: "Liberado — Wellhub (provisório)",
     plano_inativo: "Plano inativo",
+    wellhub_sem_checkin: "Check-in não feito",
     nao_cadastrado: "Não cadastrado",
     fora_do_horario: "Fora do horário do plano",
     turma_sem_matricula: "Liberado — turma sem matrícula na EVO",
