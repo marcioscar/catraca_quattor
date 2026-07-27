@@ -21,6 +21,7 @@ const INTERVALO_MS = 400;
 interface DebtorRaw {
   memberId?: number | null;
   daysLate?: number | null;
+  dueDate?: string | null;
 }
 
 function getAuthHeader(): string {
@@ -58,18 +59,35 @@ async function buscarPaginaDevedores(skip: number): Promise<DebtorRaw[]> {
 
 /**
  * Varre todas as dívidas abertas e atualiza `comDebito` no banco: `true` pra
- * quem tem dívida vencida (`daysLate > 0`), `false` pra todo o resto (assim
+ * quem tem dívida com `dueDate` já passado, `false` pra todo o resto (assim
  * quem pagou é desbloqueado no próximo ciclo). Retorna quantos alunos ficaram
  * com débito. Se a varredura falhar no meio, NÃO zera ninguém (evita liberar
  * geral por uma falha de rede) — só aplica se conseguiu a lista completa.
+ *
+ * NÃO usa `daysLate` pra decidir vencido: descoberto em 2026-07-27 (caso
+ * real: Roni Salomé da Rosa da Cunha, idMember 11224) que `daysLate` é
+ * calculado a partir do `originalDueDate`, e não é recalculado quando a EVO
+ * reagenda a cobrança (tentativas automáticas de cartão) — um débito pode
+ * mostrar "vencido há 1270 dias" com `dueDate` reagendado pra hoje ou até pro
+ * futuro. Medido nesse dia: 32 de 50 devedores (64%) eram falso-positivo por
+ * esse motivo. Critério certo: `dueDate` já é de um dia ANTERIOR a hoje
+ * (comparação por dia calendário, não por timestamp exato — "vence hoje" não
+ * é vencido ainda, mesmo com horário específico tipo 09:05 já passado).
+ * Bate com o painel da EVO, que já mostrava "Acesso liberado" pro Roni.
  */
 export async function sincronizarDebitosEvo(): Promise<number> {
   const idsComDebito = new Set<number>();
+  // Compara por DIA calendário, não por timestamp exato: "vence hoje" (ex.
+  // dueDate 27/07 09:05) não é vencido ainda, mesmo se já passou desse
+  // horário — só vence a partir de amanhã. Bate com o painel da EVO.
+  const inicioHoje = new Date();
+  inicioHoje.setHours(0, 0, 0, 0);
 
   for (let page = 0; page < MAX_PAGES; page += 1) {
     const lote = await buscarPaginaDevedores(page * TAKE);
     for (const d of lote) {
-      if (typeof d.memberId === "number" && (d.daysLate ?? 0) > 0) {
+      const vencimento = d.dueDate ? new Date(d.dueDate).getTime() : null;
+      if (typeof d.memberId === "number" && vencimento !== null && vencimento < inicioHoje.getTime()) {
         idsComDebito.add(d.memberId);
       }
     }

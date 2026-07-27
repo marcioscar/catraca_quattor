@@ -455,10 +455,22 @@ horário específicas — dois mecanismos diferentes na EVO:
   (evo-sync-job.ts, 10 min) — diferente dos syncs de horário que são
   caros/manuais.
 - **Como funciona**: o sync marca `CatracaAluno.comDebito` (true pra quem tem
-  dívida com `daysLate > 0`, false pro resto — quem paga é desbloqueado no
-  próximo ciclo). `access-handler` lê o flag local e nega com motivo
-  `saldo_devedor` (nunca chama a EVO na hora da passagem). Só zera os flags
-  se a varredura terminou inteira (falha de rede não libera geral).
+  dívida vencida, false pro resto — quem paga é desbloqueado no próximo
+  ciclo). `access-handler` lê o flag local e nega com motivo `saldo_devedor`
+  (nunca chama a EVO na hora da passagem). Só zera os flags se a varredura
+  terminou inteira (falha de rede não libera geral).
+- **Bug real corrigido em 2026-07-27** (caso: Roni Salomé da Rosa da Cunha,
+  idMember 11224, bloqueado mas painel da EVO mostrava "Acesso liberado"):
+  o critério original era `daysLate > 0`, mas **`daysLate` é calculado a
+  partir do `originalDueDate`, não do `dueDate` atual** — quando a EVO
+  reagenda a cobrança (tentativas automáticas de cartão, `chargeAttemptsCount`
+  no payload), `dueDate` vai pra hoje ou pro futuro, mas `daysLate` continua
+  contando do vencimento original (chegou a mostrar "1270 dias" com `dueDate`
+  reagendado pra hoje). Medido nesse dia: **32 de 50 devedores (64%) eram
+  falso-positivo** por causa disso. Trocado pra comparar `dueDate` contra o
+  **dia calendário de hoje** (não timestamp exato — "vence hoje" ainda não é
+  vencido, só a partir de amanhã, bate com o painel da EVO). Corrigido e
+  rerodado na hora: 37 → 13 alunos com `comDebito=true` de verdade.
 - Rota manual pra forçar: `POST /catraca/sincronizar-debitos`.
 
 ## Bugs/gotchas encontrados
