@@ -139,9 +139,111 @@ h1#nome {
 
 .grade-titulo,
 .grade-lista,
-.contador-hoje {
+.contador-hoje,
+.podio {
   position: relative;
   z-index: 1;
+}
+
+.podio {
+  flex: 0 0 auto;
+  margin-bottom: 40px;
+}
+
+.podio-titulo {
+  color: white;
+  opacity: 0.8;
+  font-size: 1.6rem;
+  font-weight: 600;
+  margin: 0 0 24px;
+  padding-left: 4px;
+}
+
+.podio-periodo {
+  font-size: 1.1rem;
+  font-weight: 400;
+  opacity: 0.6;
+  margin-left: 8px;
+}
+
+/* Os degraus entram no DOM na ordem 2º, 1º, 3º — o do meio é o mais alto. */
+.podio-lista {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 56px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.degrau {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.degrau-medalha {
+  font-size: 2rem;
+  line-height: 1;
+  margin-bottom: 8px;
+}
+
+.degrau-foto {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.08);
+  font-size: 2.4rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.6);
+  border: 4px solid rgba(255, 255, 255, 0.2);
+}
+
+.degrau-foto img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.degrau-1 .degrau-medalha { font-size: 2.6rem; }
+.degrau-1 .degrau-foto {
+  width: 168px;
+  height: 168px;
+  font-size: 3.2rem;
+  border-color: #facc15;
+  box-shadow: 0 0 40px rgba(250, 204, 21, 0.35);
+}
+.degrau-2 .degrau-foto { border-color: #cbd5e1; }
+.degrau-3 .degrau-foto { border-color: #d97706; }
+
+.degrau-nome {
+  color: white;
+  font-size: 1.05rem;
+  font-weight: 600;
+  margin: 12px 0 0;
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.degrau-1 .degrau-nome {
+  font-size: 1.3rem;
+  max-width: 240px;
+}
+
+.degrau-visitas {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.9rem;
+  margin: 4px 0 0;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 .contador-hoje {

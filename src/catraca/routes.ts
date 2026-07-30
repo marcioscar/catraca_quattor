@@ -345,6 +345,89 @@ export async function catracaRoutes(app: FastifyInstance): Promise<void> {
     };
   });
 
+  // Pódio pro monitor: quem mais veio nos ÚLTIMOS 7 DIAS (janela deslizante,
+  // não a semana seg–dom). Motivo: numa semana calendário o teto é o número de
+  // dias já corridos, então numa quinta dezenas de alunos empatam no máximo
+  // (59 na medição que fizemos) e o pódio vira ordem alfabética. Com 7 dias
+  // cheios o topo é raro (~1 aluno com 7 dias, ~8 com 6) e o pódio significa
+  // algo todo dia. Conta dias distintos com entrada liberada; só alunos —
+  // colaboradores batem o rosto todo dia de trabalho e ganhariam sempre.
+  app.get("/catraca/ranking-semana", async (request) => {
+    const query = request.query as { take?: string };
+    const take = Math.min(Number(query.take) || 3, 20);
+
+    const fim = new Date();
+    fim.setHours(0, 0, 0, 0);
+    fim.setDate(fim.getDate() + 1); // amanhã 00:00, pra incluir o dia de hoje inteiro
+    const inicio = new Date(fim);
+    inicio.setDate(inicio.getDate() - 7);
+
+    const entradas = await db.catracaAcessoLog.findMany({
+      where: { permitido: true, ocorridoEm: { gte: inicio, lt: fim } },
+      select: { idMember: true, ocorridoEm: true },
+    });
+    // `ate` é o último dia contado (hoje), não o limite exclusivo da query.
+    const ate = new Date(fim);
+    ate.setDate(ate.getDate() - 1);
+    const periodo = { desde: inicio, ate };
+
+    if (entradas.length === 0) {
+      return { ...periodo, podio: [] };
+    }
+
+    const diasPorMembro = new Map<number, Set<string>>();
+    const ultimaEntradaPorMembro = new Map<number, number>();
+    for (const entrada of entradas) {
+      const dias = diasPorMembro.get(entrada.idMember) ?? new Set<string>();
+      dias.add(chaveDoDia(entrada.ocorridoEm));
+      diasPorMembro.set(entrada.idMember, dias);
+
+      const quando = entrada.ocorridoEm.getTime();
+      if (quando > (ultimaEntradaPorMembro.get(entrada.idMember) ?? 0)) {
+        ultimaEntradaPorMembro.set(entrada.idMember, quando);
+      }
+    }
+
+    // Sem `fotoBase64` nesta primeira query: são centenas de alunos na janela,
+    // e puxar a foto de todos são megabytes de base64 à toa (deixava a rota em
+    // ~8s). Só o pódio precisa de foto.
+    const alunos = await db.catracaAluno.findMany({
+      where: { idMember: { in: [...diasPorMembro.keys()] }, tipo: "aluno", ...NAO_REMOVIDO },
+      select: { idMember: true, nome: true },
+    });
+
+    const podio = alunos
+      .map((aluno) => ({
+        ...aluno,
+        visitas: diasPorMembro.get(aluno.idMember)?.size ?? 0,
+        ultimaEntrada: ultimaEntradaPorMembro.get(aluno.idMember) ?? 0,
+      }))
+      // Empate no número de dias é comum (o teto é 7). Desempata por quem
+      // treinou mais recentemente — assim o pódio se mexe durante o dia em vez
+      // de virar uma lista alfabética congelada. Nome só como último critério.
+      .sort(
+        (a, b) =>
+          b.visitas - a.visitas ||
+          b.ultimaEntrada - a.ultimaEntrada ||
+          (a.nome ?? "").localeCompare(b.nome ?? ""),
+      )
+      .slice(0, take);
+
+    const fotos = await db.catracaAluno.findMany({
+      where: { idMember: { in: podio.map((aluno) => aluno.idMember) } },
+      select: { idMember: true, fotoBase64: true },
+    });
+    const fotoPorIdMember = new Map(fotos.map((foto) => [foto.idMember, foto.fotoBase64]));
+
+    return {
+      ...periodo,
+      podio: podio.map(({ ultimaEntrada: _ultimaEntrada, ...aluno }) => ({
+        ...aluno,
+        fotoBase64: fotoPorIdMember.get(aluno.idMember) ?? null,
+      })),
+    };
+  });
+
   // Contador do dia pro monitor — entradas liberadas desde a meia-noite (hora local do servidor).
   app.get("/catraca/acessos/contagem-hoje", async () => {
     const inicioDoDia = new Date();

@@ -2,6 +2,9 @@ const telaDetalheEl = document.getElementById("tela-detalhe");
 const telaGradeEl = document.getElementById("tela-grade");
 const gradeListaEl = document.getElementById("grade-lista");
 const contadorHojeValorEl = document.getElementById("contador-hoje-valor");
+const podioEl = document.getElementById("podio");
+const podioListaEl = document.getElementById("podio-lista");
+const podioPeriodoEl = document.getElementById("podio-periodo");
 
 const fotoEl = document.getElementById("foto");
 const avatarEl = document.getElementById("avatar");
@@ -28,10 +31,15 @@ const ROTULOS = {
 
 const MOTIVOS_WELLHUB = new Set(["wellhub_ok", "wellhub_provisorio", "wellhub_manual", "wellhub_auto"]);
 
+const MEDALHAS = ["🥇", "🥈", "🥉"];
+
 const TEMPO_DETALHE_MS = 30000;
 const QTD_GRADE = 42;
 const INTERVALO_POLL_MS = 2000;
 const INTERVALO_ATUALIZA_GRADE_MS = 5000;
+// O pódio muda no máximo uma vez por dia por aluno — varrer a semana toda a
+// cada 5s seria desperdício.
+const INTERVALO_ATUALIZA_PODIO_MS = 60000;
 
 let ultimoIdMostrado = null;
 let timeoutVoltarGrade = null;
@@ -143,6 +151,63 @@ async function carregarGrade() {
   }
 }
 
+function criarDegrau(aluno, posicao) {
+  const li = document.createElement("li");
+  li.className = `degrau degrau-${posicao}`;
+
+  const medalha = document.createElement("span");
+  medalha.className = "degrau-medalha";
+  medalha.textContent = MEDALHAS[posicao - 1] ?? `${posicao}º`;
+
+  const foto = document.createElement("div");
+  foto.className = "degrau-foto";
+  if (aluno.fotoBase64) {
+    const img = document.createElement("img");
+    img.src = aluno.fotoBase64;
+    img.alt = "";
+    foto.appendChild(img);
+  } else {
+    foto.textContent = iniciais(aluno.nome || "?");
+  }
+
+  const nome = document.createElement("p");
+  nome.className = "degrau-nome";
+  nome.textContent = aluno.nome || `Membro ${aluno.idMember}`;
+
+  const visitas = document.createElement("p");
+  visitas.className = "degrau-visitas";
+  visitas.textContent = aluno.visitas === 1 ? "1 dia" : `${aluno.visitas} dias`;
+
+  li.append(medalha, foto, nome, visitas);
+  return li;
+}
+
+function formatDia(iso) {
+  const d = new Date(iso);
+  const pad = (v) => String(v).padStart(2, "0");
+  return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}`;
+}
+
+async function carregarPodio() {
+  try {
+    const resposta = await fetch("/catraca/ranking-semana");
+    const { desde, ate, podio } = await resposta.json();
+    if (!Array.isArray(podio) || podio.length === 0) {
+      podioEl.hidden = true;
+      return;
+    }
+    podioPeriodoEl.textContent = `${formatDia(desde)} a ${formatDia(ate)}`;
+    // 2º à esquerda, 1º no meio, 3º à direita — pódio de verdade.
+    const ordem = [1, 0, 2];
+    podioListaEl.replaceChildren(
+      ...ordem.filter((indice) => podio[indice]).map((indice) => criarDegrau(podio[indice], indice + 1)),
+    );
+    podioEl.hidden = false;
+  } catch {
+    // Silencioso — só tenta de novo no próximo ciclo.
+  }
+}
+
 async function atualizarContadorHoje() {
   try {
     const resposta = await fetch("/catraca/acessos/contagem-hoje");
@@ -171,6 +236,7 @@ async function verificarNovoAcesso() {
 
 mostrarTelaGrade();
 atualizarContadorHoje();
+carregarPodio();
 verificarNovoAcesso();
 setInterval(verificarNovoAcesso, INTERVALO_POLL_MS);
 setInterval(() => {
@@ -179,3 +245,4 @@ setInterval(() => {
     atualizarContadorHoje();
   }
 }, INTERVALO_ATUALIZA_GRADE_MS);
+setInterval(carregarPodio, INTERVALO_ATUALIZA_PODIO_MS);
