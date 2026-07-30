@@ -362,8 +362,18 @@ export async function catracaRoutes(app: FastifyInstance): Promise<void> {
     const inicio = new Date(fim);
     inicio.setDate(inicio.getDate() - 7);
 
+    // `personType` filtra a passagem; o `tipo: "aluno"` lá embaixo filtra a
+    // pessoa. Os dois são necessários: o enrollid do personal vem de outro
+    // espaço de numeração e COLIDE com idMember de aluno (ver NOTES.md), então
+    // sem checar o personType da passagem um personal poderia engordar o placar
+    // do aluno com quem ele colide. Todos os writers de log já setam
+    // personType quando permitido=true (inclusive os da Wellhub, com 1).
     const entradas = await db.catracaAcessoLog.findMany({
-      where: { permitido: true, ocorridoEm: { gte: inicio, lt: fim } },
+      where: {
+        permitido: true,
+        personType: PERSON_TYPE_CLIENTE,
+        ocorridoEm: { gte: inicio, lt: fim },
+      },
       select: { idMember: true, ocorridoEm: true },
     });
     // `ate` é o último dia contado (hoje), não o limite exclusivo da query.
