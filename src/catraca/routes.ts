@@ -20,6 +20,18 @@ interface EnrollBody {
   tipo?: string;
 }
 
+// Segunda-feira 00:00 (hora local) da semana em que a data cai.
+function inicioDaSemana(data: Date): Date {
+  const inicio = new Date(data);
+  inicio.setHours(0, 0, 0, 0);
+  inicio.setDate(inicio.getDate() - ((inicio.getDay() + 6) % 7));
+  return inicio;
+}
+
+function chaveDoDia(data: Date): string {
+  return `${data.getFullYear()}-${data.getMonth()}-${data.getDate()}`;
+}
+
 export async function catracaRoutes(app: FastifyInstance): Promise<void> {
   app.get("/catraca/status", async () => ({
     conectado: isConnected(),
@@ -241,6 +253,10 @@ export async function catracaRoutes(app: FastifyInstance): Promise<void> {
       take,
     });
 
+    if (acessos.length === 0) {
+      return [];
+    }
+
     const idMembers = [...new Set(acessos.map((acesso) => acesso.idMember))];
     const alunos = await db.catracaAluno.findMany({
       where: { idMember: { in: idMembers } },
@@ -248,11 +264,39 @@ export async function catracaRoutes(app: FastifyInstance): Promise<void> {
     });
     const alunoPorIdMember = new Map(alunos.map((aluno) => [aluno.idMember, aluno]));
 
+    // Quantas vezes cada um veio na semana (segunda a domingo) do próprio
+    // acesso — conta DIAS distintos com entrada liberada, então várias
+    // passagens no mesmo dia (inclusive as confirmações tardias da Wellhub)
+    // valem uma visita só. Uma query cobrindo a faixa de semanas da lista.
+    const semanas = acessos.map((acesso) => inicioDaSemana(acesso.ocorridoEm).getTime());
+    const inicioFaixa = new Date(Math.min(...semanas));
+    const fimFaixa = new Date(Math.max(...semanas));
+    fimFaixa.setDate(fimFaixa.getDate() + 7);
+
+    const entradasDaFaixa = await db.catracaAcessoLog.findMany({
+      where: {
+        idMember: { in: idMembers },
+        permitido: true,
+        ocorridoEm: { gte: inicioFaixa, lt: fimFaixa },
+      },
+      select: { idMember: true, ocorridoEm: true },
+    });
+
+    const diasPorMembroSemana = new Map<string, Set<string>>();
+    for (const entrada of entradasDaFaixa) {
+      const chave = `${entrada.idMember}:${inicioDaSemana(entrada.ocorridoEm).getTime()}`;
+      const dias = diasPorMembroSemana.get(chave) ?? new Set<string>();
+      dias.add(chaveDoDia(entrada.ocorridoEm));
+      diasPorMembroSemana.set(chave, dias);
+    }
+
     // Prefere o nome já enriquecido via EVO; o do sendlog (device) costuma vir vazio.
     return acessos.map((acesso) => ({
       ...acesso,
       nome: alunoPorIdMember.get(acesso.idMember)?.nome ?? acesso.nome,
       fotoBase64: alunoPorIdMember.get(acesso.idMember)?.fotoBase64 ?? null,
+      visitasNaSemana:
+        diasPorMembroSemana.get(`${acesso.idMember}:${inicioDaSemana(acesso.ocorridoEm).getTime()}`)?.size ?? 0,
     }));
   });
 

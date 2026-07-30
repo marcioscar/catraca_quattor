@@ -102,7 +102,7 @@ async function carregarAcessos() {
   tabelaAcessosBody.innerHTML = "";
   if (lista.length === 0) {
     const tr = document.createElement("tr");
-    tr.innerHTML = `<td colspan="5" class="detalhe">${soNegados ? "Nenhum acesso negado neste período." : "Nenhum acesso registrado neste período."}</td>`;
+    tr.innerHTML = `<td colspan="6" class="detalhe">${soNegados ? "Nenhum acesso negado neste período." : "Nenhum acesso registrado neste período."}</td>`;
     tabelaAcessosBody.appendChild(tr);
     return;
   }
@@ -113,6 +113,7 @@ async function carregarAcessos() {
       <td>${formatDataHora(acesso.ocorridoEm)}</td>
       <td>${acesso.nome ?? "-"}</td>
       <td>${acesso.idMember}</td>
+      <td title="Dias em que veio na semana (seg–dom) deste acesso">${acesso.visitasNaSemana ?? 0}x</td>
       <td><span class="badge ${acesso.permitido ? "ativo" : "inativo"}">${rotulos[acesso.motivo] ?? acesso.motivo ?? "-"}</span></td>
     `;
     tabelaAcessosBody.appendChild(tr);
