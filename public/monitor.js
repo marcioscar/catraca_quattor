@@ -34,7 +34,9 @@ const MOTIVOS_WELLHUB = new Set(["wellhub_ok", "wellhub_provisorio", "wellhub_ma
 const MEDALHAS = ["🥇", "🥈", "🥉"];
 
 const TEMPO_DETALHE_MS = 30000;
-const QTD_GRADE = 42;
+// 10 colunas x 4 fileiras num 1920x1080 — com o pódio ocupando o topo, mais
+// que isso deixa a última fileira cortada pela metade.
+const QTD_GRADE = 40;
 const INTERVALO_POLL_MS = 2000;
 const INTERVALO_ATUALIZA_GRADE_MS = 5000;
 // O pódio muda no máximo uma vez por dia por aluno — varrer a semana toda a
