@@ -9,6 +9,7 @@ const resultadoEl = document.getElementById("resultado");
 const nomeEl = document.getElementById("nome");
 const detalheEl = document.getElementById("detalhe");
 const horarioEl = document.getElementById("horario");
+const frequenciaEl = document.getElementById("frequencia");
 
 const ROTULOS = {
   ok: "Acesso liberado",
@@ -78,6 +79,13 @@ function mostrarAcesso(acesso) {
     extra = " · plano inativo na EVO";
   }
   detalheEl.textContent = `ID ${acesso.idMember}${extra}`;
+
+  // Frequência da semana (seg–dom) do próprio acesso. Só faz sentido mostrar
+  // quando houve entrada liberada — num acesso negado a conta pode dar 0.
+  const visitas = acesso.visitasNaSemana ?? 0;
+  frequenciaEl.hidden = visitas === 0;
+  frequenciaEl.textContent = visitas === 1 ? "1ª vez na semana" : `${visitas}ª vez na semana`;
+
   horarioEl.textContent = formatHorario(acesso.ocorridoEm);
 
   if (acesso.fotoBase64) {

@@ -101,6 +101,16 @@ h1#nome {
   margin: 0 0 8px;
 }
 
+.frequencia {
+  display: inline-block;
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin: 4px 0 12px;
+  padding: 6px 18px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.15);
+}
+
 .horario {
   font-size: 1.1rem;
   opacity: 0.6;

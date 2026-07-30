@@ -32,6 +32,21 @@ function chaveDoDia(data: Date): string {
   return `${data.getFullYear()}-${data.getMonth()}-${data.getDate()}`;
 }
 
+// Quantas vezes a pessoa veio na semana (segunda a domingo) em que a data
+// cai — conta DIAS distintos com entrada liberada, então várias passagens no
+// mesmo dia (inclusive as confirmações tardias da Wellhub) valem uma visita só.
+async function contarVisitasNaSemana(idMember: number, data: Date): Promise<number> {
+  const inicio = inicioDaSemana(data);
+  const fim = new Date(inicio);
+  fim.setDate(fim.getDate() + 7);
+
+  const entradas = await db.catracaAcessoLog.findMany({
+    where: { idMember, permitido: true, ocorridoEm: { gte: inicio, lt: fim } },
+    select: { ocorridoEm: true },
+  });
+  return new Set(entradas.map((entrada) => chaveDoDia(entrada.ocorridoEm))).size;
+}
+
 export async function catracaRoutes(app: FastifyInstance): Promise<void> {
   app.get("/catraca/status", async () => ({
     conectado: isConnected(),
@@ -264,10 +279,8 @@ export async function catracaRoutes(app: FastifyInstance): Promise<void> {
     });
     const alunoPorIdMember = new Map(alunos.map((aluno) => [aluno.idMember, aluno]));
 
-    // Quantas vezes cada um veio na semana (segunda a domingo) do próprio
-    // acesso — conta DIAS distintos com entrada liberada, então várias
-    // passagens no mesmo dia (inclusive as confirmações tardias da Wellhub)
-    // valem uma visita só. Uma query cobrindo a faixa de semanas da lista.
+    // Visitas na semana de cada acesso (mesma contagem de `contarVisitasNaSemana`,
+    // mas em lote: uma query só cobrindo a faixa de semanas da lista).
     const semanas = acessos.map((acesso) => inicioDaSemana(acesso.ocorridoEm).getTime());
     const inicioFaixa = new Date(Math.min(...semanas));
     const fimFaixa = new Date(Math.max(...semanas));
@@ -328,6 +341,7 @@ export async function catracaRoutes(app: FastifyInstance): Promise<void> {
       ocorridoEm: ultimo.ocorridoEm,
       fotoBase64: aluno?.fotoBase64 ?? null,
       ativo: aluno?.ativo ?? null,
+      visitasNaSemana: await contarVisitasNaSemana(ultimo.idMember, ultimo.ocorridoEm),
     };
   });
 
