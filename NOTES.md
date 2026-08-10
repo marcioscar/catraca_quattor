@@ -454,8 +454,20 @@ horário específicas — dois mecanismos diferentes na EVO:
   matrícula real seg/qua 10:20, feita no próprio dia).
 - **Cadência**: `evo-horarios-sync-job.ts` roda `sincronizarMembershipsEvo`
   e depois `sincronizarTurmasEvo` (nessa ordem — turma-sync classifica lendo
-  o `idMembershipsAtivos` que membership-sync acabou de gravar) às 03:00
+  o `idMembershipsAtivos` que membership-sync acabou de gravar) às **12:00**
   local, todo dia. Override por `EVO_HORARIOS_SYNC_HORA` no `.env`.
+- **Por que meio-dia e não madrugada**: a primeira versão rodava às 03:00
+  (academia fechada, rajada sem concorrer com passagem), mas **o PC da
+  catraca é desligado à noite** — a rodada nunca aconteceria. Horário
+  comercial não atrapalha porque a decisão de acesso é 100% local
+  (`access-handler.ts` nunca chama a EVO na passagem): o custo da rodada é só
+  HTTP de saída + escrita no Mongo.
+- **Ponto cego conhecido**: se o PC só for ligado **depois** das 12:00, o dia
+  inteiro fica sem rodada (o `setTimeout` agenda pra 12:00 do dia seguinte) —
+  quem foi matriculado nesse intervalo só vale no dia seguinte. Como a
+  academia abre bem antes do meio-dia (Hora Certa começa 05:00), na prática
+  não deve acontecer; se acontecer, o jeito é `POST
+  /catraca/sincronizar-horarios` na mão.
 - **Nunca dispara no boot** (diferente dos outros jobs): cada restart do
   processo — ou cada save com `tsx watch` — refaria as ~1300 chamadas.
   Reagenda com `setTimeout` a cada rodada em vez de `setInterval` de 24h,
@@ -675,6 +687,6 @@ nssm remove CatracaApi confirm
    sistema antigo da EVO em `192.168.1.12`.
 7. **Restrição de horário (Hora Certa/turma)**: ~~automatizar
    `evo-membership-sync`/`evo-turma-sync`~~ — **feito em 2026-08-10**, rodam
-   às 03:00 todo dia (ver seção acima). Ainda falta calendário de feriados
+   às 12:00 todo dia (ver seção acima). Ainda falta calendário de feriados
    (linha "Feriado" da tabela Hora Certa não é aplicada) e acompanhar as
-   primeiras madrugadas pra ver se a rodada completa sem estourar 429.
+   primeiras rodadas pra ver se completam sem estourar 429.

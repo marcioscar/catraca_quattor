@@ -14,11 +14,15 @@ import { sincronizarTurmasEvo } from "./evo-turma-sync.js";
  *
  * Cadência diária (e não 10 min como os syncs baratos) porque juntos são
  * ~600-1500 chamadas à EVO por rodada, com 429 real já observado — o
- * espaçamento e o backoff ficam por conta de cada sync. Madrugada porque a
- * academia está fechada: nenhuma passagem concorre com a rajada, e o dado
- * fica fresco justamente pro início do dia.
+ * espaçamento e o backoff ficam por conta de cada sync.
+ *
+ * Meio-dia, e não madrugada: o PC da catraca é **desligado à noite**, então
+ * uma rodada às 03:00 simplesmente nunca aconteceria. Rajada em horário de
+ * funcionamento não atrapalha — a decisão de acesso é 100% local
+ * (access-handler.ts nunca chama a EVO na passagem), então o custo aqui é só
+ * HTTP de saída + escrita no Mongo.
  */
-const HORA_PADRAO = 3; // 03:00, hora local do PC da catraca
+const HORA_PADRAO = 12; // 12:00, hora local do PC da catraca
 
 /** Milissegundos até a próxima ocorrência de `hora`:00 no horário local. */
 export function msAteProximaHora(hora: number, agora = new Date()): number {
