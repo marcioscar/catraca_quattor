@@ -8,6 +8,7 @@ import { sincronizarClientesEvo, getProgressoSincronizacaoClientes } from "./evo
 import { sincronizarPlanosEvo, getProgressoSincronizacaoPlanos } from "./evo-planos-sync.js";
 import { sincronizarMembershipsEvo, getProgressoSincronizacaoMembership } from "./evo-membership-sync.js";
 import { sincronizarTurmasEvo, getProgressoSincronizacaoTurmas } from "./evo-turma-sync.js";
+import { sincronizarHorariosEvo } from "./evo-horarios-sync-job.js";
 import { sincronizarDebitosEvo } from "./evo-debito-sync.js";
 import { listarCheckinsDoDia, validarCheckinManual } from "./wellhub-checkins.js";
 import { NAO_REMOVIDO } from "./filtros.js";
@@ -198,8 +199,22 @@ export async function catracaRoutes(app: FastifyInstance): Promise<void> {
 
   // Contratos ativos por aluno (idMembership[]) + horário de turma — usados
   // pra restrição de horário (Hora Certa/turma), ver horario-restricao.ts.
-  // NÃO rodam sozinhos ainda (custo alto de chamadas à EVO, ver NOTES.md) —
-  // disparar manualmente por aqui.
+  // Rodam sozinhos 1x por dia de madrugada (evo-horarios-sync-job.ts); as
+  // rotas abaixo são pra forçar na hora, quando alguém acabou de ser
+  // matriculado numa turma e precisa entrar hoje, sem esperar a madrugada.
+  //
+  // Os dois na ordem certa (memberships → turmas), que é o que quase sempre
+  // se quer — as rotas individuais continuam existindo pra depurar cada etapa.
+  app.post("/catraca/sincronizar-horarios", async () => {
+    sincronizarHorariosEvo().catch((error) => console.error("[catraca] erro na sincronização de horários:", error));
+    return { ok: true };
+  });
+
+  app.get("/catraca/sincronizar-horarios", async () => ({
+    memberships: getProgressoSincronizacaoMembership(),
+    turmas: getProgressoSincronizacaoTurmas(),
+  }));
+
   app.post("/catraca/sincronizar-memberships", async () => {
     sincronizarMembershipsEvo().catch((error) =>
       console.error("[catraca] erro na sincronização de memberships:", error)

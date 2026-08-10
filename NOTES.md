@@ -438,11 +438,37 @@ horário específicas — dois mecanismos diferentes na EVO:
   que a EVO nunca marcou como cancelado, inviável de paginar tudo).
   `evo-turma-sync` fez outras ~637 chamadas e **bateu rate limit real (429)**
   seguido — resolvido com retry e backoff maior especificamente pra 429
-  (`ESPERA_RATE_LIMIT_MS`). **Por isso os dois jobs não rodam sozinhos** —
-  só via `POST /catraca/sincronizar-memberships` e `/catraca/
-  sincronizar-turmas`, manual. Antes de automatizar, decidir uma cadência
-  seguindo o limite real da chave (perguntar se a academia está no plano
-  API Pro ou API Plus — grátis, 100 requisições/dia).
+  (`ESPERA_RATE_LIMIT_MS`). Por causa desse custo os dois ficaram **manuais**
+  por um tempo (só via `POST /catraca/sincronizar-memberships` e
+  `/catraca/sincronizar-turmas`).
+
+### Automatizado 1x por dia (2026-08-10)
+
+- **O que o modo manual custou**: ninguém disparou o sync depois de
+  2026-07-16, então o `turmaHorarios` da base inteira congelou nessa data.
+  Aluno matriculado ou remanejado de turma depois disso apanhava
+  `fora_do_horario` **no horário certo da aula dele** — o cache dizia outro
+  dia da semana. Casos que estouraram: DAVI MORAIS SANTOS (20361, judô,
+  cache dizia quarta, matrícula real virou segunda em 03/08) e MAYA FONSECA
+  CHAGAS (24356, natação, cache com a turma antiga de ter/qui 08:45,
+  matrícula real seg/qua 10:20, feita no próprio dia).
+- **Cadência**: `evo-horarios-sync-job.ts` roda `sincronizarMembershipsEvo`
+  e depois `sincronizarTurmasEvo` (nessa ordem — turma-sync classifica lendo
+  o `idMembershipsAtivos` que membership-sync acabou de gravar) às 03:00
+  local, todo dia. Override por `EVO_HORARIOS_SYNC_HORA` no `.env`.
+- **Nunca dispara no boot** (diferente dos outros jobs): cada restart do
+  processo — ou cada save com `tsx watch` — refaria as ~1300 chamadas.
+  Reagenda com `setTimeout` a cada rodada em vez de `setInterval` de 24h,
+  pro horário não escorregar com a duração da rodada nem com horário de verão.
+- **Sobre o medo do limite de 100 req/dia**: era um palpite pelo tier grátis
+  ("API Pro/Plus"), nunca confirmado com a EVO — e na prática a chave já
+  passa disso todo dia sem reclamar, só o `evo-clientes-sync` faz ~444
+  chamadas diárias há semanas. O que existe de verdade é rate limit por
+  rajada (429), que os dois syncs já tratam com backoff. Madrugada também
+  ajuda: academia fechada, nenhuma passagem concorrendo com a rajada.
+- **Pra forçar na hora** (aluno matriculado hoje que precisa entrar hoje, sem
+  esperar a madrugada): `POST /catraca/sincronizar-horarios` roda os dois na
+  ordem certa; `GET` na mesma rota mostra o progresso dos dois.
 
 ## Bloqueio por saldo devedor (2026-07-16)
 
@@ -647,8 +673,8 @@ nssm remove CatracaApi confirm
    `setuserinfo`, não dá mais pra resolver só adivinhando campos.
 6. Só depois de tudo validado e estável: conversar sobre desativar o
    sistema antigo da EVO em `192.168.1.12`.
-7. **Restrição de horário (Hora Certa/turma)**: confirmar se a chave da EVO
-   está no plano API Pro ou API Plus (100 req/dia) antes de automatizar
-   `evo-membership-sync`/`evo-turma-sync` — hoje só rodam manual (ver seção
-   acima). Também falta calendário de feriados (linha "Feriado" da tabela
-   Hora Certa não é aplicada).
+7. **Restrição de horário (Hora Certa/turma)**: ~~automatizar
+   `evo-membership-sync`/`evo-turma-sync`~~ — **feito em 2026-08-10**, rodam
+   às 03:00 todo dia (ver seção acima). Ainda falta calendário de feriados
+   (linha "Feriado" da tabela Hora Certa não é aplicada) e acompanhar as
+   primeiras madrugadas pra ver se a rodada completa sem estourar 429.

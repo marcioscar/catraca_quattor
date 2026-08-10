@@ -7,13 +7,8 @@ import { startCatracaWsServer } from "./catraca/ws-server.js";
 import { startEvoSyncJob, startWellhubAutoValidacaoJob } from "./catraca/evo-sync-job.js";
 import { startEvoClientesSyncJob } from "./catraca/evo-clientes-sync.js";
 import { startWellhubIdsSyncJob } from "./catraca/wellhub-ids-sync.js";
+import { startEvoHorariosSyncJob } from "./catraca/evo-horarios-sync-job.js";
 import { carregarCacheInicial } from "./catraca/known-aluno-cache.js";
-
-// Sync de restrição de horário (Hora Certa/turma) NÃO inicia automaticamente
-// ainda — faz ~1000-1500 chamadas à EVO por rodada (uma por aluno ativo),
-// caro demais pra automatizar sem antes confirmar o limite diário da chave
-// de integração (ver NOTES.md, "API Plus" free tier = só 100/dia). Disparar
-// manualmente por enquanto: POST /catraca/sincronizar-memberships.
 
 const app = Fastify({ logger: true });
 
@@ -33,6 +28,11 @@ app.register(fastifyStatic, {
 // 7792 é a porta padrão do leitor facial TopData (MENU > REDE > SERVIDOR > Porta).
 const CATRACA_WS_PORT = Number(process.env.CATRACA_WS_PORT) || 7792;
 const EVO_SYNC_INTERVAL_MS = Number(process.env.EVO_SYNC_INTERVAL_MS) || undefined;
+// Hora local da rodada diária dos syncs de horário (memberships + turmas).
+// Sem `|| undefined` como os outros: 0 aqui é meia-noite, uma hora válida.
+const EVO_HORARIOS_SYNC_HORA = process.env.EVO_HORARIOS_SYNC_HORA
+  ? Number(process.env.EVO_HORARIOS_SYNC_HORA)
+  : undefined;
 
 const start = async () => {
   try {
@@ -50,6 +50,9 @@ const start = async () => {
     // sendo a única fonte completa e continua na cadência original.
     startWellhubIdsSyncJob();
     startEvoClientesSyncJob();
+    // Só agenda pra madrugada — nunca dispara no boot, senão cada restart do
+    // processo (ou cada save com `tsx watch`) refaz ~1300 chamadas à EVO.
+    startEvoHorariosSyncJob(EVO_HORARIOS_SYNC_HORA);
   } catch (err) {
     app.log.error(err);
     process.exit(1);
