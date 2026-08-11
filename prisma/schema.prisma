@@ -19,7 +19,7 @@ model CatracaAluno {
     ativo        Boolean   @default(true) // sincronizado pelo job periódico de status EVO
     comDebito    Boolean   @default(false) // aluno com dívida vencida em aberto na EVO — sincronizado a cada ciclo (evo-debito-sync.ts), bloqueia acesso mesmo ativo
     idMembershipsAtivos Int[] @default([]) // idMembership dos contratos ativos (EVO) — sincronizado periodicamente, usado pra restrição de horário (ver horario-restricao.ts). Só relevante pra tipo "aluno".
-    turmaHorarios Json? // cache dos horários de turma (weekDay/startTime/endTime) — só preenchido quando todos os planos ativos são do tipo "turma" (ver evo-turma-sync.ts)
+    turmaHorarios Json? // cache dos horários de turma (weekDay/startTime/endTime) — preenchido quando há ao menos um plano ativo do tipo "turma" e nenhum livre (ver evo-turma-sync.ts)
     enroladoEm   DateTime  @default(now())
     atualizadoEm DateTime  @updatedAt
     removidoEm   DateTime?

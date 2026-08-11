@@ -2,7 +2,7 @@ import { db } from "../db.js";
 import { autorizarEntradaEvo, PERSON_TYPE_CLIENTE, PERSON_TYPE_COLABORADOR } from "./evo-access-control.js";
 import { validarCheckInWellhub, wellhubConfigurado } from "./wellhub-access-control.js";
 import { passagemWellhubRecente } from "./wellhub-checkins.js";
-import { classificarAlunoPorPlanosAtivos } from "./evo-plano-classificacao.js";
+import { classificarPlanosAtivos } from "./evo-plano-classificacao.js";
 import { dentroDoHorarioHoraCerta, dentroDoHorarioTurma, type TurmaHorario } from "./horario-restricao.js";
 import { getPersonalPorEnrollid, PERSON_TYPE_PERSONAL } from "./personal.js";
 import type { SendLogMessage, SendLogRecord } from "./protocol.js";
@@ -33,6 +33,11 @@ type ResultadoHorario = "liberado" | "fora_do_horario" | "turma_sem_matricula";
  * sincronizado + cálculo de data), nunca chama a EVO nesse caminho. Ver
  * horario-restricao.ts e evo-plano-classificacao.ts.
  *
+ * Cada plano ativo abre a janela dele, e **basta uma bater** pra liberar: quem
+ * tem "HORA CERTA" + um plano de turma entra na janela da Hora Certa e também
+ * na aula, não na interseção das duas (que costuma ser vazia — a aula quase
+ * sempre cai fora da janela da Hora Certa, e o aluno apanhava na porta).
+ *
  * Classificado "turma" mas SEM nenhuma matrícula de turma sincronizada
  * (`turmaHorarios` vazio) é um caso à parte: não é "fora do horário", é
  * ausência de cadastro na EVO (aluno tem o plano mas ninguém marcou o
@@ -40,18 +45,28 @@ type ResultadoHorario = "liberado" | "fora_do_horario" | "turma_sem_matricula";
  * em vez de travar por um problema de cadastro que não é culpa do aluno.
  */
 async function checarHorario(aluno: { idMembershipsAtivos: number[]; turmaHorarios: unknown }): Promise<ResultadoHorario> {
-  const classificacao = await classificarAlunoPorPlanosAtivos(aluno.idMembershipsAtivos);
-  if (classificacao === "livre") {
+  const classificacoes = await classificarPlanosAtivos(aluno.idMembershipsAtivos);
+  if (classificacoes.includes("livre")) {
     return "liberado";
   }
-  if (classificacao === "horaCerta") {
-    return dentroDoHorarioHoraCerta(new Date()) ? "liberado" : "fora_do_horario";
+
+  const agora = new Date();
+
+  if (classificacoes.includes("horaCerta") && dentroDoHorarioHoraCerta(agora)) {
+    return "liberado";
   }
-  const turmas = Array.isArray(aluno.turmaHorarios) ? (aluno.turmaHorarios as TurmaHorario[]) : [];
-  if (turmas.length === 0) {
-    return "turma_sem_matricula";
+
+  if (classificacoes.includes("turma")) {
+    const turmas = Array.isArray(aluno.turmaHorarios) ? (aluno.turmaHorarios as TurmaHorario[]) : [];
+    if (turmas.length === 0) {
+      return "turma_sem_matricula";
+    }
+    if (dentroDoHorarioTurma(agora, turmas)) {
+      return "liberado";
+    }
   }
-  return dentroDoHorarioTurma(new Date(), turmas) ? "liberado" : "fora_do_horario";
+
+  return "fora_do_horario";
 }
 
 /** Registros mais antigos que isso são backlog acumulado (reader ficou

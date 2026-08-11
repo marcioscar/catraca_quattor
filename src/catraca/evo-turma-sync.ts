@@ -1,11 +1,11 @@
 import { db } from "../db.js";
-import { classificarAlunoPorPlanosAtivos } from "./evo-plano-classificacao.js";
+import { classificarPlanosAtivos } from "./evo-plano-classificacao.js";
 import type { TurmaHorario } from "./horario-restricao.js";
 
 /**
- * Cacheia o horário de turma (`/api/v2/activities/enroll/member`) só de
- * quem foi classificado como "turma" (nenhum plano ativo livre nem Hora
- * Certa) — roda depois de `evo-membership-sync.ts`. Chamada por aluno (esse
+ * Cacheia o horário de turma (`/api/v2/activities/enroll/member`) de quem tem
+ * pelo menos um plano de turma ativo e nenhum plano livre — roda depois de
+ * `evo-membership-sync.ts`. Chamada por aluno (esse
  * endpoint exige `idMember`, não tem versão em lote), mas o volume é
  * pequeno: a maioria dos alunos não tem matrícula em turma (testado em
  * 2026-07-15: só 1 em 25 alunos ativos aleatórios tinha).
@@ -120,12 +120,18 @@ export async function sincronizarTurmasEvo(): Promise<void> {
 
     for (const aluno of candidatos) {
       try {
-        const classificacao = await classificarAlunoPorPlanosAtivos(aluno.idMembershipsAtivos);
-        if (classificacao === "turma") {
+        const classificacoes = await classificarPlanosAtivos(aluno.idMembershipsAtivos);
+        // Basta UM plano de turma pra precisar do horário de aula, mesmo que o
+        // aluno também tenha Hora Certa — antes só quem era 100% turma era
+        // sincronizado, então quem tinha os dois ficava com `turmaHorarios`
+        // vazio e era barrado na própria aula. Plano livre continua dispensando
+        // a busca: ele já libera sem olhar horário nenhum (ver access-handler.ts),
+        // e esse endpoint é 1 chamada por aluno.
+        if (classificacoes.includes("turma") && !classificacoes.includes("livre")) {
           const turmas = await buscarMatriculaTurma(aluno.idMember);
           await db.catracaAluno.update({ where: { idMember: aluno.idMember }, data: { turmaHorarios: turmas as object } });
         } else {
-          // não é mais "turma" (trocou de plano) — limpa cache velho, se tinha.
+          // não precisa mais do horário de turma (trocou de plano) — limpa cache velho, se tinha.
           await db.catracaAluno.update({ where: { idMember: aluno.idMember }, data: { turmaHorarios: null } });
         }
       } catch (error) {

@@ -48,15 +48,21 @@ export function classificarPlanoPorNome(nomePlano: string | null | undefined): C
 }
 
 /**
- * Classifica um aluno a partir dos `idMembership` dos contratos ativos dele
- * (`CatracaAluno.idMembershipsAtivos`, sincronizado periodicamente) contra o
- * catálogo local (`EvoPlano`, também sincronizado). Prioridade: "livre"
- * vence qualquer outra coisa (aluno com plano livre + turma não é
- * restringido pela turma) — regra confirmada com o dono da academia.
+ * Classifica os contratos ativos de um aluno a partir dos `idMembership`
+ * deles (`CatracaAluno.idMembershipsAtivos`, sincronizado periodicamente)
+ * contra o catálogo local (`EvoPlano`, também sincronizado). Devolve **todas**
+ * as classificações distintas, não uma só: quem tem mais de um plano tem
+ * direito à janela de horário de *cada* um deles (ex.: "HORA CERTA ANUAL" +
+ * "JUDÔ 2X ANUAL" entra tanto na janela da Hora Certa quanto na aula de judô).
+ * Reduzir isso a uma classificação única fazia o plano mais restritivo comer
+ * o outro e barrava o aluno na aula — ver `checarHorario` em access-handler.ts.
+ *
+ * "livre" continua vencendo tudo na prática, mas quem aplica essa regra é
+ * quem decide o acesso, não esta função.
  */
-export async function classificarAlunoPorPlanosAtivos(idMembershipsAtivos: number[]): Promise<ClassificacaoPlano> {
+export async function classificarPlanosAtivos(idMembershipsAtivos: number[]): Promise<ClassificacaoPlano[]> {
   if (idMembershipsAtivos.length === 0) {
-    return "livre"; // sem contrato ativo conhecido — não restringe por falta de dado (ver NOTES.md)
+    return ["livre"]; // sem contrato ativo conhecido — não restringe por falta de dado (ver NOTES.md)
   }
 
   const planos = await db.evoPlano.findMany({
@@ -64,15 +70,9 @@ export async function classificarAlunoPorPlanosAtivos(idMembershipsAtivos: numbe
     select: { nameMembership: true },
   });
 
-  const classificacoes = planos.map((p) => classificarPlanoPorNome(p.nameMembership));
-  if (classificacoes.includes("livre")) {
-    return "livre";
+  if (planos.length === 0) {
+    return ["livre"]; // nenhum plano encontrado no catálogo local — não restringe por falta de dado
   }
-  if (classificacoes.includes("horaCerta")) {
-    return "horaCerta";
-  }
-  if (classificacoes.includes("turma")) {
-    return "turma";
-  }
-  return "livre"; // nenhum plano encontrado no catálogo local — não restringe por falta de dado
+
+  return [...new Set(planos.map((p) => classificarPlanoPorNome(p.nameMembership)))];
 }

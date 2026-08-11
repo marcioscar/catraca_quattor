@@ -411,7 +411,8 @@ horário específicas — dois mecanismos diferentes na EVO:
   Hora Certa, nem turma), libera sempre — mesmo tendo também um contrato
   restrito. Classificação por nome do plano contra o catálogo local
   (`EvoPlano`), confirmada com o dono da academia contra os 244 planos
-  ativos reais.
+  ativos reais. Entre dois contratos **restritos**, cada um abre a janela
+  dele e basta uma bater (ver "Planos restritos combinados" abaixo).
 - **Turma classificada mas SEM matrícula nenhuma** (2026-07-21, caso real:
   Antonio Carlos Correa, idMember 20665, plano "PILATES STUDIO 2X ANUAL",
   sempre negado às 15:51): `turmaHorarios` vazio faz `dentroDoHorarioTurma`
@@ -428,8 +429,8 @@ horário específicas — dois mecanismos diferentes na EVO:
   (nunca chama a EVO na hora da passagem) — dois jobs sincronizam
   periodicamente (mas **não automaticamente ainda**, ver abaixo) os dados
   brutos pro Mongo: `evo-membership-sync.ts` (`idMembershipsAtivos` por
-  aluno) e `evo-turma-sync.ts` (`turmaHorarios`, só de quem ficou
-  classificado "turma"). A classificação em si (`evo-plano-classificacao.ts`)
+  aluno) e `evo-turma-sync.ts` (`turmaHorarios`, de quem tem ao menos um
+  plano de turma e nenhum livre). A classificação em si (`evo-plano-classificacao.ts`)
   não é cacheada — é recalculada a cada passagem a partir do `EvoPlano` já
   sincronizado, pra não duplicar a lógica de classificação em dois lugares.
 - **Custo de API real, medido em 2026-07-15**: `evo-membership-sync` fez
@@ -481,6 +482,40 @@ horário específicas — dois mecanismos diferentes na EVO:
 - **Pra forçar na hora** (aluno matriculado hoje que precisa entrar hoje, sem
   esperar a madrugada): `POST /catraca/sincronizar-horarios` roda os dois na
   ordem certa; `GET` na mesma rota mostra o progresso dos dois.
+
+### Planos restritos combinados: o mais restritivo comia o outro (2026-08-11)
+
+- **Caso real**: LUCAS REIS BESSA (idMember 23874) tem dois contratos ativos,
+  "HORA CERTA ANUAL" (idMembership 22) e "JUDÔ 2X ANUAL" (60), e era negado
+  (`fora_do_horario`) no horário da aula de judô — 11/08 às 17:15, e mais
+  10 vezes no mesmo padrão nos 30 dias anteriores.
+- **Causa**: `classificarAlunoPorPlanosAtivos` reduzia o aluno a **uma**
+  classificação só, com prioridade `livre > horaCerta > turma`. Com os dois
+  planos restritos, "horaCerta" ganhava e o judô sumia da decisão: só as
+  janelas da Hora Certa eram checadas (terça 05-07/11-16/21-23), e a aula às
+  17h cai fora de todas. Na prática o aluno pagava pelo judô e não conseguia
+  entrar na própria aula.
+- **Segundo efeito, no sync**: `evo-turma-sync` só buscava a matrícula de
+  quem era classificado "turma" — como esses alunos eram "horaCerta", o
+  `turmaHorarios` deles ficava `null` (e era ativamente **limpo** a cada
+  rodada). Ou seja, mesmo consertando a decisão, o horário da aula não
+  existia no banco pra consultar. Os dois lados precisavam de correção.
+- **Correção**: `classificarPlanosAtivos` agora devolve **todas** as
+  classificações distintas, e `checarHorario` libera se **qualquer** uma
+  bater (união das janelas, não interseção — a interseção é quase sempre
+  vazia, já que a aula costuma cair fora da janela da Hora Certa). O
+  turma-sync passou a buscar matrícula de quem tem ao menos um plano de
+  turma e nenhum livre (plano livre continua dispensando a busca: ele libera
+  sem olhar horário nenhum, e o endpoint é 1 chamada por aluno).
+- **Alcance**: 3 alunos ativos nessa combinação (Hora Certa + turma, sem
+  plano livre) — 1785 LUCIANO SOARES CARREIRO, 23874 LUCAS REIS BESSA,
+  23363 ITALO RAFAEL ALMEIDA DO NASCIMENTO —, os três com `turmaHorarios`
+  vazio, somando 11 bloqueios indevidos em 30 dias.
+- **Efeito colateral aceito**: enquanto o turma-sync não roda, esses alunos
+  caem em `turma_sem_matricula` (libera, mesma regra de 2026-07-21) — ou
+  seja, ficam sem restrição de horário nenhuma até a próxima rodada das
+  12:00, que aperta pra janela real da aula. É o mesmo fail-open já adotado
+  pra falta de dado, e vale só pra essas 3 pessoas.
 
 ## Bloqueio por saldo devedor (2026-07-16)
 
