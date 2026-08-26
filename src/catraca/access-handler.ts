@@ -83,6 +83,35 @@ export function isHistorico(record: SendLogRecord): boolean {
 }
 
 /**
+ * Tenta liberar pela Wellhub — devolve o motivo da liberação ou `null` quando
+ * a Wellhub não autoriza. Vale tanto pra quem está inativo na EVO (só
+ * Wellhub) quanto pra quem tem contrato ativo mas esbarrou numa restrição do
+ * plano: o acesso Wellhub é pago à parte e não depende do contrato da EVO.
+ *
+ * Enquanto as credenciais da Wellhub não estiverem configuradas
+ * (`wellhubConfigurado() === false`), libera provisoriamente só por ter
+ * `wellhubId` cadastrado, sem confirmar o check-in de verdade (ver NOTES.md).
+ *
+ * Reentrada no mesmo dia (ex.: foi no carro pegar algo e voltou, ou volta à
+ * noite depois de já ter validado de manhã) não chama a Wellhub de novo — o
+ * check-in é de uso único e uma segunda tentativa de /validate falharia mesmo
+ * com a pessoa presente.
+ */
+async function tentarLiberarPelaWellhub(
+  enrollid: number,
+  wellhubId: string
+): Promise<"wellhub_ok" | "wellhub_provisorio" | null> {
+  if (!wellhubConfigurado()) {
+    return "wellhub_provisorio";
+  }
+  if (await passagemWellhubRecente(enrollid)) {
+    return "wellhub_ok";
+  }
+  const autorizacao = await validarCheckInWellhub(wellhubId);
+  return autorizacao?.autorizado ? "wellhub_ok" : null;
+}
+
+/**
  * Decide liberar/negar com base só no Mongo local — nunca chama serviço
  * externo aqui pro caminho normal, já que essa decisão precisa ser
  * instantânea a cada passagem na catraca. Única exceção: quando o cache
@@ -91,11 +120,7 @@ export function isHistorico(record: SendLogRecord): boolean {
  * pra cachear isso como o `ativo` normal, sincronizado a cada 10 min).
  *
  * Se o aluno tem `wellhubId` cadastrado, valida direto na API da Wellhub
- * (independente da EVO, ver `wellhub-access-control.ts`). Enquanto as
- * credenciais da Wellhub não chegam (`wellhubConfigurado() === false`),
- * libera provisoriamente só por ter `wellhubId` — sem confirmar o check-in
- * de verdade (ver NOTES.md). Assim que a credencial for configurada, esse
- * atalho para de valer e passa a validar o check-in de verdade.
+ * (independente da EVO, ver `tentarLiberarPelaWellhub` logo acima).
  */
 async function decidirAcesso(enrollid: number): Promise<AccessDecision> {
   // Personal trainer é decidido ANTES do CatracaAluno: o enrollid dele
@@ -131,6 +156,16 @@ async function decidirAcesso(enrollid: number): Promise<AccessDecision> {
     if (aluno.tipo === "aluno") {
       const resultadoHorario = await checarHorario(aluno);
       if (resultadoHorario === "fora_do_horario") {
+        // Fora da janela do plano da EVO, mas quem também é Wellhub tem
+        // direito a entrar pelo check-in do app: o plano de turma (pilates,
+        // judô...) restringe a aula, não o acesso Wellhub, que é pago à
+        // parte. Sem isso, quem tinha contrato ativo de outra modalidade
+        // nunca chegava no caminho Wellhub (que só rodava pra `ativo=false`)
+        // e apanhava na porta fora do horário da aula.
+        const motivoWellhub = aluno.wellhubId ? await tentarLiberarPelaWellhub(enrollid, aluno.wellhubId) : null;
+        if (motivoWellhub) {
+          return { enrollid, access: true, motivo: motivoWellhub, personType };
+        }
         return { enrollid, access: false, motivo: "fora_do_horario", personType };
       }
       if (resultadoHorario === "turma_sem_matricula") {
@@ -141,19 +176,9 @@ async function decidirAcesso(enrollid: number): Promise<AccessDecision> {
   }
 
   if (aluno.wellhubId) {
-    if (!wellhubConfigurado()) {
-      return { enrollid, access: true, motivo: "wellhub_provisorio", personType };
-    }
-    // Reentrada no mesmo dia (ex.: foi no carro pegar algo e voltou, ou volta
-    // à noite depois de já ter validado de manhã) — o check-in já foi
-    // validado, uma segunda tentativa de /validate falharia mesmo com a
-    // pessoa presente. Libera o dia todo sem chamar a Wellhub de novo.
-    if (await passagemWellhubRecente(enrollid)) {
-      return { enrollid, access: true, motivo: "wellhub_ok", personType };
-    }
-    const autorizacaoWellhub = await validarCheckInWellhub(aluno.wellhubId);
-    if (autorizacaoWellhub?.autorizado) {
-      return { enrollid, access: true, motivo: "wellhub_ok", personType };
+    const motivoWellhub = await tentarLiberarPelaWellhub(enrollid, aluno.wellhubId);
+    if (motivoWellhub) {
+      return { enrollid, access: true, motivo: motivoWellhub, personType };
     }
   }
 
