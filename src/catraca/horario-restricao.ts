@@ -1,6 +1,8 @@
 /**
  * Restrição de horário pra planos "Hora Certa" e "turma" — ver
  * evo-plano-classificacao.ts pra saber como um aluno é classificado.
+ * Em feriado vale a janela única de feriado pra todo plano restrito (a
+ * academia abre só das 08:00 às 12:00) — ver feriados.ts.
  * Decisão sempre local (Mongo + cálculo de data), nunca chama a EVO na hora
  * da passagem — ver access-handler.ts.
  */
@@ -14,9 +16,9 @@ export interface JanelaHorario {
  * Tabela fixa de "Horários de contrato" do plano Hora Certa — a API da EVO
  * não expõe esse dado (confirmado em 2026-07-15, ver NOTES.md), então foi
  * passada manualmente pelo dono da academia, direto do painel admin. Chave:
- * `Date.getDay()` (0=Domingo...6=Sábado). Não cobre feriados (linha
- * "Feriado 08:00-12:00" do painel) — feriado hoje é tratado como dia normal
- * da semana, ver NOTES.md.
+ * `Date.getDay()` (0=Domingo...6=Sábado). A linha "Feriado 08:00-12:00" do
+ * painel fica em `JANELA_FERIADO` logo abaixo, e substitui o dia da semana
+ * quando a data é feriado (ver feriados.ts).
  */
 export const HORA_CERTA_JANELAS: Record<number, JanelaHorario[]> = {
   0: [{ inicio: "08:00", fim: "12:00" }], // Domingo
@@ -48,6 +50,15 @@ export const HORA_CERTA_JANELAS: Record<number, JanelaHorario[]> = {
   6: [{ inicio: "08:00", fim: "12:00" }], // Sábado
 };
 
+/**
+ * Linha "Feriado" da mesma tabela do painel admin da EVO: em feriado a
+ * academia abre só das 08:00 às 12:00, e essa janela vale pra **qualquer**
+ * plano restrito (Hora Certa ou turma) — a aula não acontece no feriado, mas
+ * quem tem plano ativo entra no horário em que a academia está aberta
+ * (decisão do dono da academia). Ver `checarHorario` em access-handler.ts.
+ */
+export const JANELA_FERIADO: JanelaHorario = { inicio: "08:00", fim: "12:00" };
+
 const TOLERANCIA_HORA_CERTA_MIN = 15;
 const TOLERANCIA_TURMA_ANTES_MIN = 30;
 const TOLERANCIA_TURMA_DEPOIS_MIN = 20;
@@ -61,15 +72,23 @@ function minutosDoDiaAgora(agora: Date): number {
   return agora.getHours() * 60 + agora.getMinutes();
 }
 
-export function dentroDoHorarioHoraCerta(agora: Date): boolean {
-  const janelas = HORA_CERTA_JANELAS[agora.getDay()] ?? [];
+function dentroDeAlgumaJanela(agora: Date, janelas: JanelaHorario[], toleranciaMin: number): boolean {
   const minutosAgora = minutosDoDiaAgora(agora);
 
   return janelas.some((janela) => {
-    const inicio = paraMinutosDoDia(janela.inicio) - TOLERANCIA_HORA_CERTA_MIN;
-    const fim = paraMinutosDoDia(janela.fim) + TOLERANCIA_HORA_CERTA_MIN;
+    const inicio = paraMinutosDoDia(janela.inicio) - toleranciaMin;
+    const fim = paraMinutosDoDia(janela.fim) + toleranciaMin;
     return minutosAgora >= inicio && minutosAgora <= fim;
   });
+}
+
+export function dentroDoHorarioHoraCerta(agora: Date): boolean {
+  return dentroDeAlgumaJanela(agora, HORA_CERTA_JANELAS[agora.getDay()] ?? [], TOLERANCIA_HORA_CERTA_MIN);
+}
+
+/** Janela de feriado (08:00-12:00), com a mesma tolerância da Hora Certa. */
+export function dentroDoHorarioFeriado(agora: Date): boolean {
+  return dentroDeAlgumaJanela(agora, [JANELA_FERIADO], TOLERANCIA_HORA_CERTA_MIN);
 }
 
 export interface TurmaHorario {

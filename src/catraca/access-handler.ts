@@ -3,7 +3,8 @@ import { autorizarEntradaEvo, PERSON_TYPE_CLIENTE, PERSON_TYPE_COLABORADOR } fro
 import { validarCheckInWellhub, wellhubConfigurado } from "./wellhub-access-control.js";
 import { passagemWellhubRecente } from "./wellhub-checkins.js";
 import { classificarPlanosAtivos } from "./evo-plano-classificacao.js";
-import { dentroDoHorarioHoraCerta, dentroDoHorarioTurma, type TurmaHorario } from "./horario-restricao.js";
+import { dentroDoHorarioFeriado, dentroDoHorarioHoraCerta, dentroDoHorarioTurma, type TurmaHorario } from "./horario-restricao.js";
+import { ehFeriado } from "./feriados.js";
 import { getPersonalPorEnrollid, PERSON_TYPE_PERSONAL } from "./personal.js";
 import type { SendLogMessage, SendLogRecord } from "./protocol.js";
 
@@ -43,6 +44,11 @@ type ResultadoHorario = "liberado" | "fora_do_horario" | "turma_sem_matricula";
  * ausência de cadastro na EVO (aluno tem o plano mas ninguém marcou o
  * horário de aula dele) — decisão do dono da academia (2026-07-21): libera
  * em vez de travar por um problema de cadastro que não é culpa do aluno.
+ *
+ * Em **feriado** a janela do dia da semana não vale pra ninguém: a academia
+ * abre só das 08:00 às 12:00 e qualquer plano ativo entra nessa janela (não
+ * tem aula de turma no feriado, e a Hora Certa segue a linha "Feriado" da
+ * tabela do painel — ver feriados.ts e horario-restricao.ts).
  */
 async function checarHorario(aluno: { idMembershipsAtivos: number[]; turmaHorarios: unknown }): Promise<ResultadoHorario> {
   const classificacoes = await classificarPlanosAtivos(aluno.idMembershipsAtivos);
@@ -51,19 +57,25 @@ async function checarHorario(aluno: { idMembershipsAtivos: number[]; turmaHorari
   }
 
   const agora = new Date();
+  const turmas = Array.isArray(aluno.turmaHorarios) ? (aluno.turmaHorarios as TurmaHorario[]) : [];
+
+  // Antes do feriado: quem está sem matrícula nenhuma continua liberado em
+  // qualquer dia/hora, feriado ou não — o motivo pra liberar é a falha de
+  // cadastro, que independe do calendário.
+  if (classificacoes.includes("turma") && turmas.length === 0) {
+    return "turma_sem_matricula";
+  }
+
+  if (ehFeriado(agora)) {
+    return dentroDoHorarioFeriado(agora) ? "liberado" : "fora_do_horario";
+  }
 
   if (classificacoes.includes("horaCerta") && dentroDoHorarioHoraCerta(agora)) {
     return "liberado";
   }
 
-  if (classificacoes.includes("turma")) {
-    const turmas = Array.isArray(aluno.turmaHorarios) ? (aluno.turmaHorarios as TurmaHorario[]) : [];
-    if (turmas.length === 0) {
-      return "turma_sem_matricula";
-    }
-    if (dentroDoHorarioTurma(agora, turmas)) {
-      return "liberado";
-    }
+  if (classificacoes.includes("turma") && dentroDoHorarioTurma(agora, turmas)) {
+    return "liberado";
   }
 
   return "fora_do_horario";

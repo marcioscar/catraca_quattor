@@ -395,9 +395,8 @@ horário específicas — dois mecanismos diferentes na EVO:
   permissão, parece ter acesso — ver seção Wellhub acima). A tabela foi
   passada manualmente pelo dono da academia e está hardcoded em
   `horario-restricao.ts` (`HORA_CERTA_JANELAS`). Tolerância: 15 min antes do
-  início e 15 min depois do fim de cada janela. **Não cobre a linha
-  "Feriado"** da tabela (sem calendário de feriados implementado — feriado
-  hoje é tratado como dia normal da semana).
+  início e 15 min depois do fim de cada janela. A linha **"Feriado
+  08:00-12:00"** da tabela está em `JANELA_FERIADO` (ver "Feriado" abaixo).
 - **Turma marcada** (Ballet, Pilates, Judô, Natação, etc. — lista de termos
   em `evo-plano-classificacao.ts`, `TERMOS_TURMA`): usa a matrícula real do
   aluno (`GET /api/v1/activities/enrollment/member-enrollment`), com
@@ -407,6 +406,24 @@ horário específicas — dois mecanismos diferentes na EVO:
   da EVO mostra PascalCase (`WeekDay`/`StartTime`/`EndTime`) — usar o nome
   errado silenciosamente salva objeto vazio (sem erro, sem warning). Mesmo
   padrão de doc-vs-realidade divergente já visto em outros endpoints.
+- **Feriado** (2026-09-08): a academia abre só das 08:00 às 12:00, e nesse
+  dia essa janela única substitui a janela do dia da semana pra **todo plano
+  restrito** — Hora Certa (linha "Feriado" da tabela) e também turma, já que
+  não tem aula no feriado e o dono quer liberar qualquer plano ativo dentro
+  do horário em que a academia está aberta. Mesma tolerância de 15 min.
+  Calendário em `feriados.ts`: feriados **nacionais** calculados na hora
+  (fixos + os móveis derivados da Páscoa, pra não vencer na virada do ano);
+  a EVO não expõe esse calendário por API, mesmo bloqueio da tabela de
+  horários. A academia é em **Brasília (DF)**: o único feriado distrital com
+  data própria é o Dia do Evangélico (30/11), cadastrado em
+  `FERIADOS_EXTRAS` — a Fundação de Brasília (21/04) cai no mesmo dia de
+  Tiradentes e Corpus Christi (feriado no DF) já vem da lista de móveis
+  nacionais. **Ponto facultativo ficou de fora de propósito** (Quarta-feira
+  de Cinzas, 28/10, 24/12, 31/12): a academia costuma abrir nesses dias e a
+  janela de feriado é mais curta que a normal. Pra cadastrar mais datas,
+  `FERIADOS_EXTRAS` aceita "YYYY-MM-DD" (data única) ou "MM-DD" (anual).
+  Quem é "turma sem matrícula" continua liberado em qualquer horário, mesmo
+  no feriado (o motivo de liberar é a falha de cadastro, não o calendário).
 - **Prioridade**: se o aluno tem **qualquer** contrato ativo "livre" (nem
   Hora Certa, nem turma), libera sempre — mesmo tendo também um contrato
   restrito. Classificação por nome do plano contra o catálogo local
@@ -722,6 +739,7 @@ nssm remove CatracaApi confirm
    sistema antigo da EVO em `192.168.1.12`.
 7. **Restrição de horário (Hora Certa/turma)**: ~~automatizar
    `evo-membership-sync`/`evo-turma-sync`~~ — **feito em 2026-08-10**, rodam
-   às 12:00 todo dia (ver seção acima). Ainda falta calendário de feriados
-   (linha "Feriado" da tabela Hora Certa não é aplicada) e acompanhar as
-   primeiras rodadas pra ver se completam sem estourar 429.
+   às 12:00 todo dia (ver seção acima). ~~Calendário de feriados~~ — **feito
+   em 2026-09-08** (`feriados.ts`, janela 08:00-12:00 pra todo plano
+   restrito, nacionais + Dia do Evangélico do DF); falta acompanhar as
+   primeiras rodadas dos syncs pra ver se completam sem estourar 429.
