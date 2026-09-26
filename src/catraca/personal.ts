@@ -39,7 +39,7 @@ export async function getPersonalPorEnrollid(enrollid: number): Promise<Personal
     return null;
   }
   return {
-    evoPersonalId: personal.evoPersonalId,
+    evoPersonalId: enrollid, // achado pelo próprio enrollid, então nunca é null aqui
     nome: personal.nome,
     valido: temContratoValido(personal.contratos),
   };

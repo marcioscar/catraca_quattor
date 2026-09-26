@@ -13,7 +13,7 @@ model CatracaAluno {
     id           String    @id @default(auto()) @map("_id") @db.ObjectId
     idMember     Int       @unique // idMember (aluno) ou idEmployee (colaborador) da EVO, reusado como enrollid no device
     nome         String?
-    tipo         String    @default("aluno") // "aluno" | "colaborador" — define contra qual API da EVO sincronizar o `ativo`
+    tipo         String    @default("aluno") // "aluno" | "colaborador" | "personal" — define contra qual API da EVO sincronizar o `ativo`
     wellhubId    String? // gympass_id do aluno na Wellhub, preenchido manualmente — usado pra validar check-in direto na API da Wellhub quando `ativo` é false
     fotoBase64   String? // vem do próprio device (senduser) ou capturada na recepção
     ativo        Boolean   @default(true) // sincronizado pelo job periódico de status EVO
@@ -23,6 +23,20 @@ model CatracaAluno {
     enroladoEm   DateTime  @default(now())
     atualizadoEm DateTime  @updatedAt
     removidoEm   DateTime?
+
+    // Campos-sombra escritos pelo `recepcao` (contrato recepcao ↔ catraca-api,
+    // seção 6). Durante a escrita dupla os jobs da EVO continuam nos campos
+    // acima e o `recepcao` calcula os mesmos a partir dos dados próprios; a
+    // virada é `CATRACA_FONTE_ACESSO=recepcao` passar a ler estes. Todos
+    // opcionais: documento antigo não pode derrubar o findMany. Este bloco
+    // tem que ser igual ao do schema do `recepcao` (os dois dão db push).
+    ativoLocal        Boolean? // algum plano em situação "ativo" ou "a-vencer" (trancado nega)
+    comDebitoLocal    Boolean? // dívida vencida em aberto (regra da inadimplência do recepcao)
+    acessoLivre       Boolean? // algum plano vigente sem restrição de horário
+    janelasAcesso     Json? // [{ weekDay, inicio, fim, tolAntesMin, tolDepoisMin, origem }] — união das janelas dos planos restritos
+    turmaSemMatricula Boolean? // tem plano de turma vigente e nenhuma matrícula ativa
+    fonte             String? // "recepcao" só quando o registro NASCEU no recepcao — os syncs da EVO pulam (faixa-local.ts). Aluno da EVO publicado pelo recepcao fica sem fonte.
+    publicadoEm       DateTime? // última publicação do recepcao
 
     @@index([ativo])
 }
@@ -126,7 +140,7 @@ type PersonalContrato {
 
 model Personal {
     id            String             @id @default(auto()) @map("_id") @db.ObjectId
-    evoPersonalId Int
+    evoPersonalId Int? // opcional como no recepcao: personal recém-cadastrado pode ainda não ter carteirinha
     nome          String?
     contratos     PersonalContrato[]
 }

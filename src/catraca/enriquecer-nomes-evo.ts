@@ -1,6 +1,7 @@
 import { db } from "../db.js";
 import { buscarNomeEStatusPorIdMember } from "./evo-aluno-busca.js";
 import { NAO_REMOVIDO } from "./filtros.js";
+import { ehRegistroLocal } from "./faixa-local.js";
 
 /** Espaça as chamadas — a API da EVO tem rate limit agressivo (ver memória do projeto). */
 const INTERVALO_MS = 400;
@@ -34,11 +35,13 @@ export async function enriquecerNomesEvo(): Promise<void> {
   try {
     const alunos = await db.catracaAluno.findMany({
       where: { AND: [{ OR: [{ nome: null }, { nome: "" }, { nome: { isSet: false } }] }, NAO_REMOVIDO] },
-      select: { idMember: true },
+      select: { idMember: true, fonte: true },
     });
-    progresso.total = alunos.length;
+    // Registros do recepcao não existem na EVO (faixa-local.ts).
+    const daEvo = alunos.filter((aluno) => !ehRegistroLocal(aluno));
+    progresso.total = daEvo.length;
 
-    for (const aluno of alunos) {
+    for (const aluno of daEvo) {
       try {
         const resultado = await buscarNomeEStatusPorIdMember(aluno.idMember);
         if (resultado?.nome) {

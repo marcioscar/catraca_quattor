@@ -16,7 +16,13 @@ import { temContratoValido } from "./personal.js";
 export async function sincronizarPersonais(): Promise<number> {
   const personais = await db.personal.findMany();
 
-  for (const p of personais) {
+  // Personal recém-cadastrado no recepcao pode estar sem carteirinha ainda
+  // (achado A3). Filtro em JS: no Mongo, campo ausente não casa com `null`.
+  const comId = personais.filter(
+    (p): p is typeof p & { evoPersonalId: number } => typeof p.evoPersonalId === "number"
+  );
+
+  for (const p of comId) {
     const ativo = temContratoValido(p.contratos);
     await db.catracaAluno.upsert({
       where: { idMember: p.evoPersonalId },
@@ -25,5 +31,5 @@ export async function sincronizarPersonais(): Promise<number> {
     });
   }
 
-  return personais.length;
+  return comId.length;
 }

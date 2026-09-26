@@ -4,6 +4,7 @@ import { sincronizarDebitosEvo } from "./evo-debito-sync.js";
 import { sincronizarPersonais } from "./personal-sync.js";
 import { autoValidarCheckinsPendentes } from "./wellhub-checkins.js";
 import { NAO_REMOVIDO } from "./filtros.js";
+import { ehRegistroLocal } from "./faixa-local.js";
 
 const DEFAULT_INTERVAL_MS = 10 * 60 * 1000;
 
@@ -28,19 +29,22 @@ function sincronizarContra(
  * `idEmployee`), então cada grupo sincroniza contra a lista certa.
  */
 async function syncAtivos(): Promise<void> {
-  const cadastrados = await db.catracaAluno.findMany({
+  const todos = await db.catracaAluno.findMany({
     where: NAO_REMOVIDO,
-    select: { idMember: true, ativo: true, tipo: true },
+    select: { idMember: true, ativo: true, tipo: true, fonte: true },
   });
-  if (cadastrados.length === 0) {
+  // Registro mantido pelo recepcao (id na faixa local ou `fonte: "recepcao"`)
+  // não existe na EVO — sincronizar contra ela trancaria o aluno (achado A1).
+  const daEvo = todos.filter((registro) => !ehRegistroLocal(registro));
+  if (daEvo.length === 0) {
     return;
   }
 
   // Personal (tipo "personal") tem `ativo` vindo da validade do contrato
   // (personal-sync.ts) — não sincroniza contra member/employee (o enrollid
   // dele colide com outra pessoa, daria status errado).
-  const alunos = cadastrados.filter((r) => r.tipo !== "colaborador" && r.tipo !== "personal");
-  const colaboradores = cadastrados.filter((registro) => registro.tipo === "colaborador");
+  const alunos = daEvo.filter((r) => r.tipo !== "colaborador" && r.tipo !== "personal");
+  const colaboradores = daEvo.filter((registro) => registro.tipo === "colaborador");
 
   const [idsAlunosAtivos, idsColaboradoresAtivos] = await Promise.all([
     alunos.length > 0 ? fetchIdMembersAtivos() : Promise.resolve(new Set<number>()),

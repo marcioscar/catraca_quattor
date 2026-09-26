@@ -3,6 +3,7 @@ import { buildSetUserInfo } from "./protocol.js";
 import { isConnected, send } from "./connection-manager.js";
 import { marcarConhecido } from "./known-aluno-cache.js";
 import { buscarNomeEStatusPorIdMember } from "./evo-aluno-busca.js";
+import { ehRegistroLocal } from "./faixa-local.js";
 
 export type EnrollResult =
   | { ok: true }
@@ -38,7 +39,12 @@ export async function classificarPessoa(
  * checar a lista de colaboradores conhecidos e os dois espaços de id da EVO.
  */
 export async function importarAlunoDoDispositivo(idMember: number, nomeDoDevice: string): Promise<void> {
-  const evo = await buscarNomeEStatusPorIdMember(idMember).catch(() => null);
+  // Id da faixa local não existe na EVO — perguntar lá, na melhor hipótese,
+  // não acha nada; se a EVO um dia alcançar a faixa, traria o nome de outra
+  // pessoa. Fica com o nome digitado no painel.
+  const evo = ehRegistroLocal({ idMember })
+    ? null
+    : await buscarNomeEStatusPorIdMember(idMember).catch(() => null);
   const nome = evo?.nome || nomeDoDevice || null;
 
   await db.catracaAluno.upsert({
@@ -67,7 +73,9 @@ export async function importarFotoDoDispositivo(idMember: number, fotoBase64Pura
   if (existente) {
     await db.catracaAluno.update({ where: { idMember }, data: { fotoBase64 } });
   } else {
-    const evo = await buscarNomeEStatusPorIdMember(idMember).catch(() => null);
+    const evo = ehRegistroLocal({ idMember })
+      ? null
+      : await buscarNomeEStatusPorIdMember(idMember).catch(() => null);
     await db.catracaAluno.create({
       data: { idMember, fotoBase64, nome: evo?.nome ?? null, tipo: evo?.tipo ?? "aluno", ativo: true },
     });

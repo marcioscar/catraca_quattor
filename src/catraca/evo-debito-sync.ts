@@ -1,4 +1,5 @@
 import { db } from "../db.js";
+import { ehRegistroLocal } from "./faixa-local.js";
 
 /**
  * Marca `CatracaAluno.comDebito` de quem tem dívida vencida em aberto na EVO
@@ -98,10 +99,20 @@ export async function sincronizarDebitosEvo(): Promise<number> {
   }
 
   // Só chega aqui se a varredura terminou sem lançar erro (lista completa).
-  await db.catracaAluno.updateMany({ where: { comDebito: true }, data: { comDebito: false } });
-  if (idsComDebito.size > 0) {
+  // Registros do recepcao (faixa local / `fonte: "recepcao"`) ficam fora:
+  // a EVO não os conhece, então não é ela que decide o débito deles.
+  const marcados = await db.catracaAluno.findMany({
+    where: { comDebito: true },
+    select: { idMember: true, fonte: true },
+  });
+  const idsParaLimpar = marcados.filter((r) => !ehRegistroLocal(r)).map((r) => r.idMember);
+  if (idsParaLimpar.length > 0) {
+    await db.catracaAluno.updateMany({ where: { idMember: { in: idsParaLimpar } }, data: { comDebito: false } });
+  }
+  const idsDaEvo = [...idsComDebito].filter((idMember) => !ehRegistroLocal({ idMember }));
+  if (idsDaEvo.length > 0) {
     await db.catracaAluno.updateMany({
-      where: { idMember: { in: [...idsComDebito] } },
+      where: { idMember: { in: idsDaEvo } },
       data: { comDebito: true },
     });
   }
