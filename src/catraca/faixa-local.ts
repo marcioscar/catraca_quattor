@@ -9,8 +9,10 @@
  * veio na lista de ativos", o aluno recém-convertido seria trancado na porta
  * no ciclo seguinte (achado A1). Esses registros ficam fora dos syncs da EVO.
  *
- * `fonte: "recepcao"` cobre o caso de o `recepcao` publicar um id fora da
- * faixa (aluno vindo da EVO, depois da virada).
+ * `fonte: "recepcao"` marca o registro que NASCEU no recepcao (mesmo que um
+ * dia caia fora da faixa). Aluno vindo da EVO também recebe os campos-sombra
+ * do recepcao, mas sem `fonte` — o `ativo` dele continua vindo da EVO até a
+ * virada, e por isso ele precisa continuar nos syncs.
  */
 export const FAIXA_LOCAL_INICIO = 50_000;
 export const FAIXA_LOCAL_FIM_EXCLUSIVO = 100_000;

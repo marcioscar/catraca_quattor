@@ -35,7 +35,7 @@ model CatracaAluno {
     acessoLivre       Boolean? // algum plano vigente sem restrição de horário
     janelasAcesso     Json? // [{ weekDay, inicio, fim, tolAntesMin, tolDepoisMin, origem }] — união das janelas dos planos restritos
     turmaSemMatricula Boolean? // tem plano de turma vigente e nenhuma matrícula ativa
-    fonte             String? // "recepcao" quando o registro é mantido pelo recepcao — os syncs da EVO pulam (faixa-local.ts)
+    fonte             String? // "recepcao" só quando o registro NASCEU no recepcao — os syncs da EVO pulam (faixa-local.ts). Aluno da EVO publicado pelo recepcao fica sem fonte.
     publicadoEm       DateTime? // última publicação do recepcao
 
     @@index([ativo])
