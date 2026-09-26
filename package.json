@@ -8,7 +8,8 @@
     "start": "node dist/index.js",
     "typecheck": "tsc --noEmit",
     "db:generate": "prisma generate",
-    "fake-device": "tsx scripts/fake-device.ts"
+    "fake-device": "tsx scripts/fake-device.ts",
+    "test": "tsx --test test/*.test.ts"
   },
   "dependencies": {
     "@fastify/static": "^9.1.3",
