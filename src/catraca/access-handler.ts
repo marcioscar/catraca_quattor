@@ -6,6 +6,7 @@ import { classificarPlanosAtivos } from "./evo-plano-classificacao.js";
 import { dentroDoHorarioFeriado, dentroDoHorarioHoraCerta, dentroDoHorarioTurma, type TurmaHorario } from "./horario-restricao.js";
 import { ehFeriado } from "./feriados.js";
 import { getPersonalPorEnrollid, PERSON_TYPE_PERSONAL } from "./personal.js";
+import { decidirPeloRecepcao, fonteAcesso, type DecisaoLocal } from "./fonte-acesso.js";
 import type { SendLogMessage, SendLogRecord } from "./protocol.js";
 
 export interface AccessDecision {
@@ -158,6 +159,61 @@ async function decidirAcesso(enrollid: number): Promise<AccessDecision> {
 
   const personType = aluno.tipo === "colaborador" ? PERSON_TYPE_COLABORADOR : PERSON_TYPE_CLIENTE;
 
+  // F2: aluno decidido pelos campos que o recepcao publica. Colaborador segue
+  // no `ativo` de sempre (os da EVO pela lista de funcionários; os nascidos no
+  // recepcao já entram com ativo=true e a F0 tira dos syncs).
+  if (aluno.tipo === "aluno") {
+    const agora = new Date();
+    const local = decidirPeloRecepcao(aluno, agora, ehFeriado(agora));
+    if (fonteAcesso(process.env.CATRACA_FONTE_ACESSO) === "recepcao" && local !== "sem_publicacao") {
+      return decidirComRecepcao(enrollid, aluno.wellhubId, local, personType);
+    }
+    // Modo sombra: a porta segue a EVO, e a divergência vai pro log do
+    // serviço pra conferir antes de virar a flag.
+    const pelaEvo = await decidirPelaEvo(enrollid, aluno, personType);
+    const localLibera = local === "liberado" || local === "turma_sem_matricula";
+    const viaWellhub = pelaEvo.motivo === "wellhub_ok" || pelaEvo.motivo === "wellhub_provisorio";
+    if (local !== "sem_publicacao" && !viaWellhub && localLibera !== pelaEvo.access) {
+      console.info("[fonte-acesso] divergência", { enrollid, evo: pelaEvo.motivo, recepcao: local });
+    }
+    return pelaEvo;
+  }
+
+  return decidirPelaEvo(enrollid, aluno, personType);
+}
+
+/**
+ * Decisão pelos campos-sombra do recepcao (`CATRACA_FONTE_ACESSO=recepcao`).
+ * A Wellhub entra por cima de "inativo" e de "fora do horário", igual ao
+ * caminho da EVO. Não consulta a EVO em tempo real: depois da virada ela não
+ * sabe das vendas e renovações feitas no recepcao.
+ */
+async function decidirComRecepcao(
+  enrollid: number,
+  wellhubId: string | null,
+  local: Exclude<DecisaoLocal, "sem_publicacao">,
+  personType: number
+): Promise<AccessDecision> {
+  if (local === "liberado") return { enrollid, access: true, motivo: "ok", personType };
+  if (local === "turma_sem_matricula") return { enrollid, access: true, motivo: "turma_sem_matricula", personType };
+  if (local === "saldo_devedor") return { enrollid, access: false, motivo: "saldo_devedor", personType };
+
+  const motivoWellhub = wellhubId ? await tentarLiberarPelaWellhub(enrollid, wellhubId) : null;
+  if (motivoWellhub) return { enrollid, access: true, motivo: motivoWellhub, personType };
+
+  if (local === "fora_do_horario") return { enrollid, access: false, motivo: "fora_do_horario", personType };
+  if (wellhubId) return { enrollid, access: false, motivo: "wellhub_sem_checkin" };
+  return { enrollid, access: false, motivo: "plano_inativo" };
+}
+
+type CatracaAlunoDoc = NonNullable<Awaited<ReturnType<typeof db.catracaAluno.findUnique>>>;
+
+/** A decisão de sempre, pelos campos que os jobs da EVO escrevem. */
+async function decidirPelaEvo(
+  enrollid: number,
+  aluno: CatracaAlunoDoc,
+  personType: Parameters<typeof autorizarEntradaEvo>[1]
+): Promise<AccessDecision> {
   if (aluno.ativo) {
     // Débito vencido em aberto trava mesmo o aluno ativo (regra: qualquer
     // atraso, ver NOTES.md). Só pra "aluno" — colaborador não tem débito de

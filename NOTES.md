@@ -614,6 +614,33 @@ horário específicas — dois mecanismos diferentes na EVO:
   mudança de schema em produção (não só `db:generate`, que só gera o client
   TS e não sincroniza índices/constraints com o banco).
 
+## Fonte da decisão de acesso: EVO ou recepcao (F2, 2026-09-28)
+
+`CATRACA_FONTE_ACESSO` no `.env` do PC decide de onde vem a decisão do
+**aluno** (colaborador e personal não mudam):
+
+- `evo` (padrão, ou variável ausente): como sempre — `ativo`, `comDebito`,
+  `idMembershipsAtivos`, `turmaHorarios`, escritos pelos jobs da EVO. Toda
+  vez que a decisão do recepcao seria diferente, sai uma linha
+  `[fonte-acesso] divergência` no `logs\out.log` (modo sombra).
+- `recepcao`: os campos-sombra que o recepcao publica em cada venda,
+  renovação, trancamento, cancelamento e pagamento, e reconcilia a cada 10 min
+  (`ativoLocal`, `comDebitoLocal`, `acessoLivre`, `janelasAcesso`,
+  `turmaSemMatricula`). Wellhub continua entrando por cima de "inativo" e de
+  "fora do horário". Não consulta a EVO em tempo real. Aluno que o recepcao
+  nunca publicou (`publicadoEm` vazio) cai na decisão da EVO.
+
+Simulação contra produção em 28/09 (segunda 15h): mudar pra `recepcao`
+barra 28 trancados e 26 com saldo devedor que a EVO deixava entrar (decisões
+de 26/09); nenhum aluno que a EVO barra passa a entrar.
+
+Ligar / voltar atrás — editar `C:\catraca-api\.env` e reiniciar:
+```powershell
+nssm restart CatracaApi
+```
+Os jobs da EVO continuam rodando e escrevendo os campos antigos, então voltar
+pra `evo` é imediato e volta exatamente ao comportamento anterior.
+
 ## Operação no PC da catraca (Windows, serviço `CatracaApi` via NSSM)
 
 Instalado em 2026-07-09 em `C:\catraca-api`, sem Docker, rodando como
