@@ -92,3 +92,11 @@ export async function validarCheckInWellhub(wellhubId: string): Promise<Autoriza
     clearTimeout(timeoutId);
   }
 }
+
+/**
+ * "Check-In already validated" da Wellhub: alguém (o recepcao, em geral) já
+ * validou o check-in de hoje dessa pessoa — só vale um por dia.
+ */
+export function jaValidadoNaWellhub(mensagem: string | null | undefined): boolean {
+  return /already validated/i.test(mensagem ?? "");
+}

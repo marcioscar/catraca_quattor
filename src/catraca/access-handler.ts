@@ -1,7 +1,7 @@
 import { db } from "../db.js";
 import { autorizarEntradaEvo, PERSON_TYPE_CLIENTE, PERSON_TYPE_COLABORADOR } from "./evo-access-control.js";
-import { validarCheckInWellhub, wellhubConfigurado } from "./wellhub-access-control.js";
-import { passagemWellhubRecente } from "./wellhub-checkins.js";
+import { jaValidadoNaWellhub, validarCheckInWellhub, wellhubConfigurado } from "./wellhub-access-control.js";
+import { checkinDeHoje, checkinValidadoHoje, passagemWellhubRecente } from "./wellhub-checkins.js";
 import { classificarPlanosAtivos } from "./evo-plano-classificacao.js";
 import { dentroDoHorarioFeriado, dentroDoHorarioHoraCerta, dentroDoHorarioTurma, type TurmaHorario } from "./horario-restricao.js";
 import { ehFeriado } from "./feriados.js";
@@ -109,6 +109,12 @@ export function isHistorico(record: SendLogRecord): boolean {
  * noite depois de já ter validado de manhã) não chama a Wellhub de novo — o
  * check-in é de uso único e uma segunda tentativa de /validate falharia mesmo
  * com a pessoa presente.
+ *
+ * Desde 29/09/2026 o recepcao valida o check-in assim que ele chega do app
+ * (`WellhubCheckin.validadoEm`): a porta libera na hora, sem chamada externa.
+ * A chamada ao vivo fica para quando o recepcao não validou (fora do ar,
+ * validação desligada). Se ela responder "already validated" e houver
+ * check-in de hoje desse token, é a corrida com o recepcao — libera também.
  */
 async function tentarLiberarPelaWellhub(
   enrollid: number,
@@ -120,8 +126,17 @@ async function tentarLiberarPelaWellhub(
   if (await passagemWellhubRecente(enrollid)) {
     return "wellhub_ok";
   }
+  if (await checkinValidadoHoje(wellhubId)) {
+    return "wellhub_ok";
+  }
   const autorizacao = await validarCheckInWellhub(wellhubId);
-  return autorizacao?.autorizado ? "wellhub_ok" : null;
+  if (autorizacao?.autorizado) {
+    return "wellhub_ok";
+  }
+  if (autorizacao && jaValidadoNaWellhub(autorizacao.mensagem) && (await checkinDeHoje(wellhubId))) {
+    return "wellhub_ok";
+  }
+  return null;
 }
 
 /**

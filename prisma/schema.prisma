@@ -158,6 +158,20 @@ model WellhubCheckin {
     payload    Json?
     recebidoEm DateTime @default(now())
 
+    // Campos gravados pelo recepcao (espelho do schema dele, todos opcionais e
+    // SEM índice — um `db push` de qualquer um dos dois lados reescreve os
+    // índices desta coleção). A porta só lê `validadoEm`: o recepcao valida o
+    // check-in na Wellhub assim que ele chega (features/wellhub/processar-checkin.server.ts).
+    vinculoPendente   Boolean?
+    checkinEm         DateTime?
+    produto           String?
+    validadoEm        DateTime?
+    validacaoStatus   String?
+    validacaoMensagem String?
+    alunoId           String?   @db.ObjectId
+    sugestaoAlunoId   String?   @db.ObjectId
+    resolucao         String?
+
     @@index([gympassId])
     @@index([recebidoEm])
 }
