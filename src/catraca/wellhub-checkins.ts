@@ -67,7 +67,9 @@ export async function listarCheckinsDoDia(dia?: string): Promise<CheckinListado[
   return checkins.map((c) => {
     const aluno = alunoPorGympassId.get(c.gympassId!);
     const idMember = aluno?.idMember ?? null;
-    const validado = idMember !== null && idMembersValidados.has(idMember);
+    // Validado pelo recepcao na chegada do check-in (`validadoEm`) ou por uma
+    // passagem Wellhub no dia.
+    const validado = c.validadoEm != null || (idMember !== null && idMembersValidados.has(idMember));
     const validavel = !validado && agora - c.recebidoEm.getTime() < JANELA_VALIDACAO_MS;
     return {
       gympassId: c.gympassId!,
@@ -93,6 +95,9 @@ export interface ResultadoValidacaoManual {
  * como validado na lista e no histórico de acessos).
  */
 export async function validarCheckinManual(gympassId: string): Promise<ResultadoValidacaoManual> {
+  if (await checkinValidadoHoje(gympassId)) {
+    return { ok: true, mensagem: "Check-in já validado pela recepção." };
+  }
   const resultado = await validarCheckInWellhub(gympassId);
   if (resultado === null) {
     return { ok: false, mensagem: "Wellhub não configurado ou indisponível." };
@@ -131,6 +136,36 @@ export async function passagemWellhubRecente(idMember: number): Promise<boolean>
     select: { id: true },
   });
   return passagem !== null;
+}
+
+function inicioDeHoje(): Date {
+  const inicio = new Date();
+  inicio.setHours(0, 0, 0, 0);
+  return inicio;
+}
+
+/**
+ * True se o recepcao já validou na Wellhub um check-in de HOJE desse token
+ * (`WellhubCheckin.validadoEm`, gravado assim que o check-in chega do app —
+ * modelo "Automated Trigger"). A porta libera sem chamar a Wellhub: além de
+ * mais rápido, chamar de novo daria "already validated" e barraria a pessoa.
+ * Mesmo corte de "hoje" (meia-noite local do PC) de `passagemWellhubRecente`.
+ */
+export async function checkinValidadoHoje(wellhubId: string): Promise<boolean> {
+  const checkin = await db.wellhubCheckin.findFirst({
+    where: { gympassId: wellhubId, validadoEm: { gte: inicioDeHoje() } },
+    select: { id: true },
+  });
+  return checkin !== null;
+}
+
+/** Algum check-in de hoje desse token chegou pelo webhook (validado ou não). */
+export async function checkinDeHoje(wellhubId: string): Promise<boolean> {
+  const checkin = await db.wellhubCheckin.findFirst({
+    where: { gympassId: wellhubId, recebidoEm: { gte: inicioDeHoje() } },
+    select: { id: true },
+  });
+  return checkin !== null;
 }
 
 /**

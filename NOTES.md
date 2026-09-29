@@ -217,6 +217,21 @@ confirmado observando tráfego real:
   — os dois têm `serialNumber` vazio/nulo). Precisa verificar no painel
   admin da EVO ou com o suporte deles antes de conseguir validar de verdade.
 
+### Validação na chegada, pelo recepcao (29/09/2026)
+
+- O `recepcao` passou a validar o check-in na Wellhub **assim que o webhook
+  chega** ("Automated Trigger", modelo que a Wellhub exige) e grava
+  `WellhubCheckin.validadoEm`. A porta confere isso **antes** de chamar a
+  Wellhub (`checkinValidadoHoje` em `wellhub-checkins.ts`): libera na hora,
+  sem chamada externa, o dia todo.
+- Validar duas vezes dá "Check-In already validated" (só um por pessoa por
+  dia). Se a chamada ao vivo responder isso e houver check-in de hoje do
+  token, libera (corrida com o recepcao). A auto-validação de 15 min e o
+  "Validar" manual pulam o que o recepcao já validou.
+- **Ordem de ligar**: este deploy primeiro, depois a flag
+  `WELLHUB_VALIDAR_NO_CHECKIN=true` no recepcao. Ao contrário, a porta
+  revalida e barra todo Wellhub.
+
 ## Wellhub direto (independente da EVO)
 
 - **Decisão**: o dono da academia quer parar de depender da EVO no futuro, e
