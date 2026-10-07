@@ -24,6 +24,7 @@ const ROTULOS = {
   wellhub_sem_checkin: "Check-in não feito — negado",
   nao_cadastrado: "Não cadastrado — negado",
   fora_do_horario: "Fora do horário do plano — negado",
+  dia_nao_permitido: "Dia não permitido — matriculado só em outro dia da semana — negado",
   turma_sem_matricula: "Acesso liberado — turma sem matrícula na EVO",
   saldo_devedor: "Saldo devedor — negado",
   personal_vencido: "Personal — contrato vencido — negado",

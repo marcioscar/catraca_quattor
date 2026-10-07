@@ -19,6 +19,7 @@ export interface AccessDecision {
     | "wellhub_provisorio"
     | "wellhub_ok"
     | "fora_do_horario"
+    | "dia_nao_permitido"
     | "saldo_devedor"
     | "personal_vencido"
     | "turma_sem_matricula"
@@ -216,7 +217,9 @@ async function decidirComRecepcao(
   const motivoWellhub = wellhubId ? await tentarLiberarPelaWellhub(enrollid, wellhubId) : null;
   if (motivoWellhub) return { enrollid, access: true, motivo: motivoWellhub, personType };
 
-  if (local === "fora_do_horario") return { enrollid, access: false, motivo: "fora_do_horario", personType };
+  if (local === "fora_do_horario" || local === "dia_nao_permitido") {
+    return { enrollid, access: false, motivo: local, personType };
+  }
   if (wellhubId) return { enrollid, access: false, motivo: "wellhub_sem_checkin" };
   return { enrollid, access: false, motivo: "plano_inativo" };
 }

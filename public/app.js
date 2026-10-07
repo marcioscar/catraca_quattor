@@ -90,6 +90,7 @@ async function carregarAcessos() {
     wellhub_sem_checkin: "Check-in não feito",
     nao_cadastrado: "Não cadastrado",
     fora_do_horario: "Fora do horário do plano",
+    dia_nao_permitido: "Dia não permitido — matriculado só em outro dia da semana",
     turma_sem_matricula: "Liberado — turma sem matrícula na EVO",
     saldo_devedor: "Saldo devedor",
     personal_vencido: "Personal — contrato vencido",
