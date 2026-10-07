@@ -76,6 +76,13 @@ test("plano restrito: dentro da janela com tolerância entra, fora não", () => 
   assert.equal(decidirPeloRecepcao(aluno, segunda(20, 21), false), "fora_do_horario");
 });
 
+test("dia sem janela (matriculado só em outro dia) é dia_nao_permitido, não fora_do_horario", () => {
+  const aluno = publicado({ acessoLivre: false, janelasAcesso: [pilatesSegunda] });
+  const terca = new Date(segunda(19).getTime() + 24 * 3600e3);
+  assert.equal(decidirPeloRecepcao(aluno, terca, false), "dia_nao_permitido");
+  assert.equal(decidirPeloRecepcao(aluno, segunda(3), false), "fora_do_horario"); // dia certo, hora errada
+});
+
 test("feriado usa só a janela de feriado", () => {
   const aluno = publicado({ acessoLivre: false, janelasAcesso: [pilatesSegunda, feriadoManha] });
   assert.equal(decidirPeloRecepcao(aluno, segunda(10), true), "liberado");

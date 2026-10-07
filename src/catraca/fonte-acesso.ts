@@ -47,6 +47,8 @@ export type DecisaoLocal =
   | "saldo_devedor"
   | "liberado"
   | "turma_sem_matricula"
+  /** Tem janelas, mas nenhuma neste dia da semana: veio em dia que não é o da matrícula dele. */
+  | "dia_nao_permitido"
   | "fora_do_horario";
 
 function minutos(horaMinuto: string): number {
@@ -96,5 +98,19 @@ export function decidirPeloRecepcao(aluno: CamposRecepcao, agora: Date, feriado:
   if (aluno.comDebitoLocal) return "saldo_devedor";
   if (aluno.acessoLivre) return "liberado";
   if (aluno.turmaSemMatricula) return "turma_sem_matricula";
-  return dentroDasJanelas(agora, lerJanelas(aluno.janelasAcesso), feriado) ? "liberado" : "fora_do_horario";
+  const janelas = lerJanelas(aluno.janelasAcesso);
+  if (dentroDasJanelas(agora, janelas, feriado)) return "liberado";
+  return temJanelaNoDia(agora, janelas, feriado) ? "fora_do_horario" : "dia_nao_permitido";
+}
+
+/**
+ * Distingue "dia certo, hora errada" de "dia errado": quem está matriculado só
+ * na quarta e vem na segunda não tem "horário" errado, tem o DIA errado (plano
+ * 1x/semana, por exemplo). Sem nenhuma janela publicada, fica "fora_do_horario"
+ * como sempre — não dá pra dizer que o dia é errado.
+ */
+export function temJanelaNoDia(agora: Date, janelas: JanelaAcessoLocal[], feriado: boolean): boolean {
+  if (janelas.length === 0) return true;
+  const chave: number | "feriado" = feriado ? "feriado" : agora.getDay();
+  return janelas.some((j) => j.weekDay === chave);
 }
