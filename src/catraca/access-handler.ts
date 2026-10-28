@@ -114,8 +114,13 @@ export function isHistorico(record: SendLogRecord): boolean {
  * Desde 29/09/2026 o recepcao valida o check-in assim que ele chega do app
  * (`WellhubCheckin.validadoEm`): a porta libera na hora, sem chamada externa.
  * A chamada ao vivo fica para quando o recepcao não validou (fora do ar,
- * validação desligada). Se ela responder "already validated" e houver
- * check-in de hoje desse token, é a corrida com o recepcao — libera também.
+ * validação desligada).
+ *
+ * Se a validação não passar (expirado, cancelado, "not found", "already
+ * validated", Wellhub fora do ar...) mas o check-in de hoje desse token chegou
+ * pelo webhook, libera mesmo assim — pedido do dono da academia em 28/10/2026:
+ * check-in de aula agendada no app estava sendo barrado na porta. Na dúvida,
+ * quem fez check-in Wellhub hoje entra.
  */
 async function tentarLiberarPelaWellhub(
   enrollid: number,
@@ -134,7 +139,13 @@ async function tentarLiberarPelaWellhub(
   if (autorizacao?.autorizado) {
     return "wellhub_ok";
   }
-  if (autorizacao && jaValidadoNaWellhub(autorizacao.mensagem) && (await checkinDeHoje(wellhubId))) {
+  if (await checkinDeHoje(wellhubId)) {
+    if (autorizacao && !jaValidadoNaWellhub(autorizacao.mensagem)) {
+      console.info("[wellhub] check-in de hoje sem validação, liberado mesmo assim", {
+        enrollid,
+        mensagem: autorizacao.mensagem,
+      });
+    }
     return "wellhub_ok";
   }
   return null;
