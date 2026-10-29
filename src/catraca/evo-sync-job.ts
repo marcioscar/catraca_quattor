@@ -58,15 +58,18 @@ async function syncAtivos(): Promise<void> {
 }
 
 /** Roda os syncs de forma independente — falha de um não impede os outros. */
-function rodarSyncs(): void {
-  syncAtivos().catch((error) => console.error("[catraca] erro no sync de ativos:", error));
-  sincronizarDebitosEvo().catch((error) => console.error("[catraca] erro no sync de débitos:", error));
+function rodarSyncs(comEvo: boolean): void {
+  if (comEvo) {
+    syncAtivos().catch((error) => console.error("[catraca] erro no sync de ativos:", error));
+    sincronizarDebitosEvo().catch((error) => console.error("[catraca] erro no sync de débitos:", error));
+  }
   sincronizarPersonais().catch((error) => console.error("[catraca] erro no sync de personais:", error));
 }
 
-export function startEvoSyncJob(intervalMs = DEFAULT_INTERVAL_MS): void {
-  rodarSyncs();
-  setInterval(rodarSyncs, intervalMs);
+/** `comEvo=false` (EVO_JOBS=desligado) mantém só o sync de personais, que é local. */
+export function startEvoSyncJob(intervalMs = DEFAULT_INTERVAL_MS, comEvo = true): void {
+  rodarSyncs(comEvo);
+  setInterval(() => rodarSyncs(comEvo), intervalMs);
 }
 
 /**

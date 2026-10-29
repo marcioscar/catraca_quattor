@@ -9,6 +9,7 @@ import { startEvoClientesSyncJob } from "./catraca/evo-clientes-sync.js";
 import { startWellhubIdsSyncJob } from "./catraca/wellhub-ids-sync.js";
 import { startEvoHorariosSyncJob } from "./catraca/evo-horarios-sync-job.js";
 import { carregarCacheInicial } from "./catraca/known-aluno-cache.js";
+import { evoJobsLigados } from "./catraca/evo-jobs.js";
 
 const app = Fastify({ logger: true });
 
@@ -33,26 +34,32 @@ const EVO_SYNC_INTERVAL_MS = Number(process.env.EVO_SYNC_INTERVAL_MS) || undefin
 const EVO_HORARIOS_SYNC_HORA = process.env.EVO_HORARIOS_SYNC_HORA
   ? Number(process.env.EVO_HORARIOS_SYNC_HORA)
   : undefined;
+// Virada: EVO_JOBS=desligado para tudo que chama a EVO em segundo plano (ver evo-jobs.ts).
+const EVO_JOBS_LIGADOS = evoJobsLigados(process.env.EVO_JOBS);
 
 const start = async () => {
   try {
     await app.listen({ port: 3001, host: "0.0.0.0" });
     await carregarCacheInicial();
     startCatracaWsServer(CATRACA_WS_PORT);
-    startEvoSyncJob(EVO_SYNC_INTERVAL_MS);
+    startEvoSyncJob(EVO_SYNC_INTERVAL_MS, EVO_JOBS_LIGADOS);
     startWellhubAutoValidacaoJob();
-    // wellhub-ids-sync (30min, barato) só enxerga check-ins que passaram
-    // pelo sistema da própria EVO — quem valida direto com a Wellhub (nosso
-    // caminho mais comum, ver wellhub-access-control.ts) fica invisível pra
-    // esse relatório (confirmado em 2026-07-21: gympassId certo no perfil,
-    // mas ausente no relatório de check-ins). Por isso continua sendo só um
-    // complemento rápido — o full-crawl diário (evo-clientes-sync.ts) segue
-    // sendo a única fonte completa e continua na cadência original.
-    startWellhubIdsSyncJob();
-    startEvoClientesSyncJob();
-    // Só agenda pra madrugada — nunca dispara no boot, senão cada restart do
-    // processo (ou cada save com `tsx watch`) refaz ~1300 chamadas à EVO.
-    startEvoHorariosSyncJob(EVO_HORARIOS_SYNC_HORA);
+    if (!EVO_JOBS_LIGADOS) {
+      app.log.info("EVO_JOBS=desligado: sem sync de ativos/débitos, clientes, ids Wellhub e horários da EVO");
+    } else {
+      // wellhub-ids-sync (30min, barato) só enxerga check-ins que passaram
+      // pelo sistema da própria EVO — quem valida direto com a Wellhub (nosso
+      // caminho mais comum, ver wellhub-access-control.ts) fica invisível pra
+      // esse relatório (confirmado em 2026-07-21: gympassId certo no perfil,
+      // mas ausente no relatório de check-ins). Por isso continua sendo só um
+      // complemento rápido — o full-crawl diário (evo-clientes-sync.ts) segue
+      // sendo a única fonte completa e continua na cadência original.
+      startWellhubIdsSyncJob();
+      startEvoClientesSyncJob();
+      // Só agenda pra madrugada — nunca dispara no boot, senão cada restart do
+      // processo (ou cada save com `tsx watch`) refaz ~1300 chamadas à EVO.
+      startEvoHorariosSyncJob(EVO_HORARIOS_SYNC_HORA);
+    }
   } catch (err) {
     app.log.error(err);
     process.exit(1);
